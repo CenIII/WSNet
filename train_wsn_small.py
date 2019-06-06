@@ -68,6 +68,7 @@ def train(net, data, label, optimizer, crit, epoches=100):
 
 		optimizer.zero_grad()
 		loss.backward()
+		print('iterno='+str(iterno)+', loss='+str(loss))
 
 		if iterno%2==0:
 			# todo: visualize attention map
