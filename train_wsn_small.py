@@ -18,7 +18,7 @@ import numpy as np
 
 
 def visualize(net, label, fig, ax, cb, iterno):
-	hm = net.getAttention(label).data.numpy()
+	hm = net.getAttention(label).data.cpu().numpy()
 
 	# plot here
 	for i in range(len(ax[0])):
@@ -27,7 +27,7 @@ def visualize(net, label, fig, ax, cb, iterno):
 			cb[0][i].remove()
 		cb[0][i] = plt.colorbar(img,ax=ax[0][i])
 
-	hm = net.getGradAttention().data.numpy()
+	hm = net.getGradAttention().data.cpu().numpy()
 
 	# plot here
 	for i in range(len(ax[1])):
