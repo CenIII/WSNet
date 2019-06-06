@@ -15,7 +15,7 @@ import os
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
-
+matplotlib.use('tkagg')
 
 def visualize(net, label, fig, ax, cb, iterno):
 	hm = net.getAttention(label).data.cpu().numpy()
