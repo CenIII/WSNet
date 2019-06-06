@@ -58,6 +58,7 @@ def train(net, data, label, optimizer, crit, epoches=100):
 		data = data.cuda()
 		net = net.cuda()
 		crit = crit.cuda()
+		label = label.cuda()
 	fig, ax = plt.subplots(nrows=2, ncols=2)
 	
 	iterno = 0
