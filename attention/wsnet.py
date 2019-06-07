@@ -69,7 +69,7 @@ class WeaklySupNet(nn.Module):
         # feature mining
         pre_hm_m = self.linear_mining(self.feats.detach())
         self.heatmaps_m = torch.log(1+F.relu(pre_hm_m))
-        pred_m = F.sigmoid(torch.mean((self.heatmaps_m - 0.12*F.relu(-pre_hm_m)).view(self.feats.shape[0],-1,2),dim=1).squeeze(),dim=1)
+        pred_m = F.sigmoid(torch.mean((self.heatmaps_m - 0.12*F.relu(-pre_hm_m)).view(self.feats.shape[0],-1,2),dim=1).squeeze())
 
         return pred, pred_m
 
