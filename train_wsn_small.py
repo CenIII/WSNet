@@ -15,6 +15,7 @@ import os
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+import matplotlib
 matplotlib.use('tkagg')
 
 def visualize(net, label, fig, ax, cb, iterno):
@@ -41,7 +42,7 @@ def visualize(net, label, fig, ax, cb, iterno):
 	return cb
 
 def loadData():
-	filelist = os.listdir('./data')
+	filelist = sorted(os.listdir('./data'))
 	imgs = []
 	for file in filelist:
 		imgs.append(np.moveaxis(cv2.imread(os.path.join('./data/',file)),-1,0))
