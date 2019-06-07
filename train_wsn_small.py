@@ -72,7 +72,7 @@ def train(net, data, label, optimizer, crit, epoches=100):
 		loss.backward()
 		print('iterno='+str(iterno)+', loss='+str(loss))
 
-		if iterno%2==0:
+		if iterno%5==0:
 			# todo: visualize attention map
 			visualize(net,label,fig,ax,cb,iterno)
 		optimizer.step()
