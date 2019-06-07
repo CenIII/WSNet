@@ -37,6 +37,13 @@ def visualize(net, label, fig, ax, cb, iterno):
 			cb[1][i].remove()
 		cb[1][i] = plt.colorbar(img,ax=ax[1][i])
 
+	hm = net.getAttention_m(label).data.cpu().numpy()
+	for i in range(len(ax[2])):
+		img = ax[2][i].imshow(hm[2+i*3])
+		if cb[2][i] is not None:
+			cb[2][i].remove()
+		cb[2][i] = plt.colorbar(img,ax=ax[1][i])
+
 	fig.suptitle('iteration '+str(iterno))
 	plt.pause(0.05)
 	return cb
@@ -46,7 +53,7 @@ def loadData():
 	imgs = []
 	for file in filelist:
 		imgs.append(np.moveaxis(cv2.imread(os.path.join('./data/',file)),-1,0))
-	label = [0,0,0,1,1,1]
+	label = [0,0,0,1,1,1,2,2,2]
 
 	imgs = torch.tensor(imgs).type(device.FloatTensor)
 	label = torch.tensor(label)
@@ -60,13 +67,14 @@ def train(net, data, label, optimizer, crit, epoches=100):
 		net = net.cuda()
 		crit = crit.cuda()
 		label = label.cuda()
-	fig, ax = plt.subplots(nrows=2, ncols=2)
+	fig, ax = plt.subplots(nrows=3, ncols=2)
 	
 	iterno = 0
-	cb = [[None,None],[None,None]]
+	cb = [[None,None],[None,None],[None,None]]
 	while True:
-		pred = net(data)
+		pred, pred_m = net(data)
 		loss = crit(pred, label)
+		loss += crit(pred_m, label)
 
 		optimizer.zero_grad()
 		loss.backward()
