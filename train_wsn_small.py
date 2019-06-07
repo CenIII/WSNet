@@ -61,7 +61,7 @@ def loadData():
 	return imgs, label
 
 
-def train(net, data, label, optimizer1, optimizer2, crit, epoches=100):
+def train(net, data, label, optimizer, crit, epoches=100):
 	if torch.cuda.is_available():
 		data = data.cuda()
 		net = net.cuda()
@@ -74,20 +74,16 @@ def train(net, data, label, optimizer1, optimizer2, crit, epoches=100):
 	while True:
 		pred, pred_m = net(data)
 		loss = crit(pred, label)
-		loss_m = crit(pred_m, label)
+		loss += crit(pred_m, label)
 
-		optimizer1.zero_grad()
+		optimizer.zero_grad()
 		loss.backward()
 		print('iterno='+str(iterno)+', loss='+str(loss))
+
 		if iterno%5==0:
 			# todo: visualize attention map
 			visualize(net,label,fig,ax,cb,iterno)
-		optimizer1.step()
-		optimizer2.zero_grad()
-		loss_m.backward()
-		optimizer2.step()
-		
-		
+		optimizer.step()
 		# time.sleep(0.1)
 		iterno += 1
 
@@ -96,8 +92,7 @@ def train(net, data, label, optimizer1, optimizer2, crit, epoches=100):
 if __name__ == '__main__':
 
 	net = WeaklySupNet()
-	optimizer1 = torch.optim.Adam(list(net.conv.parameters())+list(net.linear_final.parameters()),lr=0.001)
-	optimizer2 = torch.optim.Adam(list(net.linear_mining.parameters()),lr=0.001)
+	optimizer = torch.optim.Adam(net.parameters(),lr=0.001)
 	crit = torch.nn.NLLLoss()
 	data, label = loadData()
-	train(net, data, label, optimizer1, optimizer2, crit)
+	train(net, data, label, optimizer, crit)
