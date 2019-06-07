@@ -42,7 +42,7 @@ def visualize(net, label, fig, ax, cb, iterno):
 		img = ax[2][i].imshow(hm[2+i*3])
 		if cb[2][i] is not None:
 			cb[2][i].remove()
-		cb[2][i] = plt.colorbar(img,ax=ax[1][i])
+		cb[2][i] = plt.colorbar(img,ax=ax[2][i])
 
 	fig.suptitle('iteration '+str(iterno))
 	plt.pause(0.05)
