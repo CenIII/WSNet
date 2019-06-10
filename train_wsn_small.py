@@ -51,9 +51,9 @@ def visualize(net, label, fig, ax, cb, iterno):
 def loadData():
 	filelist = sorted(os.listdir('./data'))
 	imgs = []
-	for file in filelist:
+	for file in filelist[:6]:
 		imgs.append(np.moveaxis(cv2.imread(os.path.join('./data/',file)),-1,0))
-	label = [0,0,0,1,1,1,2,2,2]
+	label = [0,0,0,1,1,1]#,2,2,2
 
 	imgs = torch.tensor(imgs).type(device.FloatTensor)
 	label = torch.tensor(label)
@@ -73,8 +73,8 @@ def train(net, data, label, optimizer, crit, epoches=100):
 	cb = [[None,None],[None,None],[None,None]]
 	while True:
 		pred, pred_m = net(data)
-		loss = crit(pred, label)
-		loss += crit(pred_m, label)
+		loss = crit(pred, label)/6
+		loss += crit(pred_m, label)/6
 
 		optimizer.zero_grad()
 		loss.backward()
@@ -91,7 +91,7 @@ def train(net, data, label, optimizer, crit, epoches=100):
 
 if __name__ == '__main__':
 
-	net = WeaklySupNet()
+	net = WeaklySupNet(nclass=2)
 	optimizer = torch.optim.Adam(net.parameters(),lr=0.001)
 	crit = torch.nn.NLLLoss()
 	data, label = loadData()

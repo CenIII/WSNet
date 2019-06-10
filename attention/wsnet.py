@@ -16,7 +16,7 @@ class WeaklySupNet(nn.Module):
     and without pruning. Slight modifications have been done for speedup
     """
    
-    def __init__(self):
+    def __init__(self,nclass):
         super(WeaklySupNet,self).__init__()     
 
         self.conv = nn.Sequential(
@@ -27,14 +27,14 @@ class WeaklySupNet(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Conv2d(64, 128, (3, 3)),
-            nn.ReLU(),
-            nn.MaxPool2d(2)#,
+            nn.ReLU()
             # nn.Conv2d(16, 8, (3, 3)),
             # nn.ReLU(),
             # nn.MaxPool2d(2)
             )
-        self.linear_final = nn.Linear(128,3)
-        self.linear_mining = nn.Linear(128,3)
+        self.linear_final = nn.Linear(128,nclass)
+        self.linear_mining = nn.Linear(128,nclass)
+        self.nclass = nclass
 
     def getHMgrad(self,grad):
         self.hmgrad = grad
@@ -64,12 +64,12 @@ class WeaklySupNet(nn.Module):
         
         # linear # softmax
         # pred = F.log_softmax(torch.mean(self.heatmaps.view(2,-1,2),dim=1).squeeze(),dim=1)
-        pred = F.log_softmax(torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.feats.shape[0],-1,3),dim=1).squeeze(),dim=1)
+        pred = F.log_softmax(torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze(),dim=1)
 
         # feature mining
         pre_hm_m = self.linear_mining(self.feats.detach())
         self.heatmaps_m = torch.log(1+F.relu(pre_hm_m))
-        pred_m = F.sigmoid(torch.mean((self.heatmaps_m - 0.12*F.relu(-pre_hm_m)).view(self.feats.shape[0],-1,3),dim=1).squeeze())
+        pred_m = torch.log(F.sigmoid(torch.mean((self.heatmaps_m - 0.12*F.relu(-pre_hm_m)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()))
 
         return pred, pred_m
 
