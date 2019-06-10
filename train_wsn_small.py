@@ -1,7 +1,11 @@
+"""
+high level support for doing this and that.
+"""
 import torch
 from torch.autograd import Variable
 import tqdm
 import numpy as np
+from utils.loss import multilabel_soft_pull_loss
 
 if torch.cuda.is_available():
 	import torch.cuda as device
@@ -23,7 +27,7 @@ def visualize(net, label, fig, ax, cb, iterno):
 
 	# plot here
 	for i in range(len(ax[0])):
-		img = ax[0][i].imshow(hm[2+i*3])
+		img = ax[0][i].imshow(hm[1+i*4])
 		if cb[0][i] is not None:
 			cb[0][i].remove()
 		cb[0][i] = plt.colorbar(img,ax=ax[0][i])
@@ -39,10 +43,15 @@ def visualize(net, label, fig, ax, cb, iterno):
 
 	hm = net.getAttention_m(label).data.cpu().numpy()
 	for i in range(len(ax[2])):
-		img = ax[2][i].imshow(hm[2+i*3])
+		img = ax[2][i].imshow(hm[1+i*4])
 		if cb[2][i] is not None:
 			cb[2][i].remove()
 		cb[2][i] = plt.colorbar(img,ax=ax[2][i])
+	for i in range(len(ax[3])):
+		img = ax[3][i].imshow(hm[8+i])
+		if cb[3][i] is not None:
+			cb[3][i].remove()
+		cb[3][i] = plt.colorbar(img,ax=ax[3][i])
 
 	fig.suptitle('iteration '+str(iterno))
 	plt.pause(0.05)
@@ -51,9 +60,9 @@ def visualize(net, label, fig, ax, cb, iterno):
 def loadData():
 	filelist = sorted(os.listdir('./data'))
 	imgs = []
-	for file in filelist[:6]:
+	for file in filelist:
 		imgs.append(np.moveaxis(cv2.imread(os.path.join('./data/',file)),-1,0))
-	label = [0,0,0,1,1,1]#,2,2,2
+	label = [[1,0],[1,0],[1,0],[1,0],[0,1],[0,1],[0,1],[0,1],[1,1],[1,1]]
 
 	imgs = torch.tensor(imgs).type(device.FloatTensor)
 	label = torch.tensor(label)
@@ -61,20 +70,21 @@ def loadData():
 	return imgs, label
 
 
-def train(net, data, label, optimizer, crit, epoches=100):
+def train(net, data, label, optimizer, crit0, crit1, epoches=100):
 	if torch.cuda.is_available():
 		data = data.cuda()
 		net = net.cuda()
-		crit = crit.cuda()
+		crit0 = crit0.cuda()
+		crit1 = crit1.cuda()
 		label = label.cuda()
-	fig, ax = plt.subplots(nrows=3, ncols=2)
+	fig, ax = plt.subplots(nrows=4, ncols=2)
 	
 	iterno = 0
-	cb = [[None,None],[None,None],[None,None]]
+	cb = [[None,None],[None,None],[None,None],[None,None]]
 	while True:
 		pred, pred_m = net(data)
-		loss = crit(pred, label)/6
-		loss += crit(pred_m, label)/6
+		loss = crit0(pred, label)
+		loss += crit1(pred_m, label)
 
 		optimizer.zero_grad()
 		loss.backward()
@@ -93,6 +103,7 @@ if __name__ == '__main__':
 
 	net = WeaklySupNet(nclass=2)
 	optimizer = torch.optim.Adam(net.parameters(),lr=0.001)
-	crit = torch.nn.NLLLoss()
+	crit0 = torch.nn.MultiLabelSoftMarginLoss()
+	crit1 = multilabel_soft_pull_loss
 	data, label = loadData()
-	train(net, data, label, optimizer, crit)
+	train(net, data, label, optimizer, crit0, crit1)

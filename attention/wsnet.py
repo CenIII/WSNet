@@ -1,8 +1,8 @@
+"""
+high level support for doing this and that.
+"""
 import torch
-import numpy as np
-from torch.autograd import Variable
 import torch.nn.functional as F
-import torch.utils.data as data_utils
 import torch.nn as nn
 
 if torch.cuda.is_available():
@@ -47,12 +47,12 @@ class WeaklySupNet(nn.Module):
     def getAttention(self,classid):
         zzz = classid[:,None,None,None].repeat(1,self.heatmaps.shape[1],self.heatmaps.shape[2],1)
         hm = torch.gather(self.heatmaps,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
-        return hm#torch.exp(hm)
+        return hm
 
     def getAttention_m(self,classid):
         zzz = classid[:,None,None,None].repeat(1,self.heatmaps_m.shape[1],self.heatmaps_m.shape[2],1)
         hm = torch.gather(self.heatmaps_m,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
-        return hm#torch.exp(hm)        
+        return hm
 
     def forward(self,x):
         feats = self.conv(x) #torch.Size([2, 16, 64, 64])
@@ -64,12 +64,12 @@ class WeaklySupNet(nn.Module):
         
         # linear # softmax
         # pred = F.log_softmax(torch.mean(self.heatmaps.view(2,-1,2),dim=1).squeeze(),dim=1)
-        pred = F.log_softmax(torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze(),dim=1)
+        pred = torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()
 
-        # feature mining
+        # feature mining, no weight normalization
         pre_hm_m = self.linear_mining(self.feats.detach())
         self.heatmaps_m = torch.log(1+F.relu(pre_hm_m))
-        pred_m = torch.log(F.sigmoid(torch.mean((self.heatmaps_m - 0.12*F.relu(-pre_hm_m)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()))
+        pred_m = torch.mean((self.heatmaps_m - 0.12*F.relu(-pre_hm_m)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()
 
         return pred, pred_m
 
