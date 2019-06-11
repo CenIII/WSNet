@@ -4,7 +4,7 @@ high level support for doing this and that.
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-
+from torch.nn.utils import weight_norm
 if torch.cuda.is_available():
     import torch.cuda as device
 else:
@@ -28,7 +28,6 @@ class WeaklySupNet(nn.Module):
             nn.MaxPool2d(2),
             nn.Conv2d(64, 128, (3, 3)),
             nn.ReLU()
-            # nn.Conv2d(16, 8, (3, 3)),
             # nn.ReLU(),
             # nn.MaxPool2d(2)
             )
@@ -66,7 +65,8 @@ class WeaklySupNet(nn.Module):
         # pred = F.log_softmax(torch.mean(self.heatmaps.view(2,-1,2),dim=1).squeeze(),dim=1)
         pred = torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()
 
-        # feature mining, no weight normalization
+        # feature mining, weight normalization
+        # tmp = torch.softmax(self.linear_mining.weight*100,dim=1)
         pre_hm_m = self.linear_mining(self.feats.detach())
         self.heatmaps_m = torch.log(1+F.relu(pre_hm_m))
         pred_m = torch.mean((self.heatmaps_m - 0.12*F.relu(-pre_hm_m)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()
