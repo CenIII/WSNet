@@ -9,7 +9,7 @@ if torch.cuda.is_available():
     import torch.cuda as device
 else:
     import torch as device
-
+from .relation import Relation
 class WeaklySupNet(nn.Module):
     """
     The class is an implementation of the paper A Structured Self-Attentive Sentence Embedding including regularization
@@ -27,9 +27,9 @@ class WeaklySupNet(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Conv2d(64, 128, (3, 3)),
-            nn.ReLU()
-            # nn.ReLU(),
-            # nn.MaxPool2d(2)
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            Relation(128,128,4)
             )
         self.linear_final = nn.Linear(128,nclass)
         self.linear_mining = nn.Linear(128,nclass)
