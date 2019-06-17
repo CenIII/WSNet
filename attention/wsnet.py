@@ -20,18 +20,17 @@ class WeaklySupNet(nn.Module):
         super(WeaklySupNet,self).__init__()     
 
         self.conv = nn.Sequential(
-            nn.Conv2d(3, 16, (3, 3)),#, padding=(1,0)),
+            nn.Conv2d(3, 32, (3, 3)),#, padding=(1,0)),
+            nn.ReLU(),
+            nn.MaxPool2d(4),
+            nn.Conv2d(32, 64, (3, 3)),
             nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(16, 32, (3, 3)),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 32, (3, 3))
-            # nn.MaxPool2d(2)
+            nn.Conv2d(64, 64, (3, 3))
+            
             )
-        self.rel = Relation(32,32,4)
-        self.linear_final = nn.Linear(32,nclass)
-        # self.linear_mining = nn.Linear(64,nclass)
+        self.rel = Relation(64,64,4)
+        self.linear_final = nn.Linear(128,nclass)
         self.nclass = nclass
 
     def getHMgrad(self,grad):
@@ -47,15 +46,10 @@ class WeaklySupNet(nn.Module):
         hm = torch.gather(self.heatmaps,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
         return hm
 
-    def getAttention_m(self,classid):
-        zzz = classid[:,None,None,None].repeat(1,self.heatmaps_m.shape[1],self.heatmaps_m.shape[2],1)
-        hm = torch.gather(self.heatmaps_m,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
-        return hm
-
     def forward(self,x):
         feats = self.conv(x) #torch.Size([2, 16, 64, 64])
         rel_feats = self.rel(feats)
-        feats = rel_feats #torch.cat((feats,rel_feats),dim=1)
+        feats = torch.cat((feats,rel_feats),dim=1)
         self.feats = feats.permute(0,2,3,1)
         self.feats.register_hook(self.getHMgrad)
 
@@ -63,29 +57,6 @@ class WeaklySupNet(nn.Module):
         self.heatmaps = torch.log(1+F.relu(pre_hm)) #- 0.2*F.relu(-pre_hm)#torch.sqrt() 
         
         # linear # softmax
-        # pred = F.log_softmax(torch.mean(self.heatmaps.view(2,-1,2),dim=1).squeeze(),dim=1)
         pred = torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()
-
-        # feature mining, weight normalization
-        # tmp = torch.softmax(self.linear_mining.weight*100,dim=1)
-        # pre_hm_m = self.linear_mining(self.feats.detach())
-        # self.heatmaps_m = torch.log(1+F.relu(pre_hm_m))
-        # pred_m = torch.mean((self.heatmaps_m - 0.12*F.relu(-pre_hm_m)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()
-
-        return pred#, pred_m
-
-
-
-# class Criterion(nn.Module):
-#     """docstring for Criterion"""
-#     def __init__(self):
-#         super(Criterion, self).__init__()
-    
-#     def forward(self,pred,label):
-#         loss = 0.
-#         for i in range(len(pred)):
-#             pr = pred[i][label[i]]
-#             targ = pr.clone().detach()+2.
-#             loss += (targ-pr)**2
-#         return loss
+        return pred
         
