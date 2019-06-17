@@ -36,25 +36,25 @@ def visualize(net, label, fig, ax, cb, iterno):
 
 	# plot here
 	for i in range(len(ax[1])):
-		img = ax[1][i].imshow(hm[2+i*3])
+		img = ax[1][i].imshow(hm[1+i*4])
 		if cb[1][i] is not None:
 			cb[1][i].remove()
 		cb[1][i] = plt.colorbar(img,ax=ax[1][i])
 
-	hm = net.getAttention_m(label).data.cpu().numpy()
-	for i in range(len(ax[2])):
-		img = ax[2][i].imshow(hm[1+i*4])
-		if cb[2][i] is not None:
-			cb[2][i].remove()
-		cb[2][i] = plt.colorbar(img,ax=ax[2][i])
+	# hm = net.getAttention_m(label).data.cpu().numpy()
+	# for i in range(len(ax[2])):
+	# 	img = ax[2][i].imshow(hm[1+i*4])
+	# 	if cb[2][i] is not None:
+	# 		cb[2][i].remove()
+	# 	cb[2][i] = plt.colorbar(img,ax=ax[2][i])
 	
 	# get 8th image's both heatmaps
-	hm = net.heatmaps[8].data.cpu().numpy()
-	for i in range(len(ax[3])):
-		img = ax[3][i].imshow(hm[:,:,i+1])
-		if cb[3][i] is not None:
-			cb[3][i].remove()
-		cb[3][i] = plt.colorbar(img,ax=ax[3][i])
+	# hm = net.heatmaps[8].data.cpu().numpy()
+	# for i in range(len(ax[2])):
+	# 	img = ax[2][i].imshow(hm[:,:,i+1])
+	# 	if cb[2][i] is not None:
+	# 		cb[2][i].remove()
+	# 	cb[2][i] = plt.colorbar(img,ax=ax[2][i])
 
 	fig.suptitle('iteration '+str(iterno))
 	plt.pause(0.05)
@@ -73,7 +73,7 @@ def loadData():
 	return imgs, label, label_vis
 
 
-def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
+def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 	if torch.cuda.is_available():
 		data = data.cuda()
 		net = net.cuda()
@@ -81,14 +81,14 @@ def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 		# crit1 = crit1.cuda()
 		label = label.cuda()
 		label_vis = label_vis.cuda()
-	fig, ax = plt.subplots(nrows=4, ncols=2)
+	fig, ax = plt.subplots(nrows=2, ncols=2)
 	
 	iterno = 0
-	cb = [[None,None],[None,None],[None,None],[None,None]]
+	cb = [[None,None],[None,None]]
 	while True:
-		pred, pred_m = net(data)
-		loss = crit0(pred, label)
-		loss += crit1(pred_m, label)
+		pred = net(data[:8])
+		loss = crit0(pred, label[:8])
+		# loss += crit1(pred_m, label)
 
 		optimizer.zero_grad()
 		loss.backward()
@@ -96,7 +96,7 @@ def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 
 		if iterno%5==0:
 			# todo: visualize attention map
-			visualize(net,label_vis,fig,ax,cb,iterno)
+			visualize(net,label_vis[:8],fig,ax,cb,iterno)
 		optimizer.step()
 		# time.sleep(0.1)
 		iterno += 1
@@ -108,6 +108,6 @@ if __name__ == '__main__':
 	net = WeaklySupNet(nclass=3)
 	optimizer = torch.optim.Adam(net.parameters(),lr=0.001)
 	crit0 = torch.nn.MultiLabelSoftMarginLoss()
-	crit1 = multilabel_soft_pull_loss
+	# crit1 = multilabel_soft_pull_loss
 	data, label, label_vis = loadData()
-	train(net, data, label, label_vis, optimizer, crit0, crit1)
+	train(net, data, label, label_vis, optimizer, crit0)#, crit1)
