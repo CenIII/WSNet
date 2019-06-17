@@ -14,6 +14,7 @@ class Relation(nn.Module):
         self.hdim = int(outchannel/nheads)
         self.ksize = kernel_size
         self.qkv = nn.Conv2d(inchannel,int(3*outchannel),(1,1),bias=False) # q k v
+        self.transform = nn.Conv2d(outchannel,outchannel,(1,1),bias=False)
 
     def forward(self,x): # NxDxHxW
         qkv = self.qkv(x)
@@ -31,6 +32,7 @@ class Relation(nn.Module):
         att = torch.softmax(tmp,2) # (4,32,25,38440)
         V_trans = im2col_indices(V,Hf,Wf,2).view(self.nheads,self.hdim,Hf*Wf,-1)
         out = (V_trans*att).sum(2).view(D,H,W,N).permute(3,0,1,2)
+        out = self.transform(out)
         return out
 
     
