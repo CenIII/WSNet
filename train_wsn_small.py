@@ -65,12 +65,30 @@ def loadData():
 	imgs = []
 	for file in filelist:
 		imgs.append(np.moveaxis(cv2.imread(os.path.join('./data/',file)),-1,0))
-	label = [[1,0],[1,0],[1,0],[1,0],[0,1],[0,1],[0,1],[0,1],[1,1],[1,1]]
-	label_vis = [0,0,0,0,1,1,1,1,0,1]
+	label = [[1,0],[1,0],[1,0],[1,0],[0,1],[0,1],[0,1],[0,1]]
+	label_vis = [0,0,0,0,1,1,1,1]
 	imgs = torch.tensor(imgs).type(device.FloatTensor)
 	label = torch.tensor(label).type(device.FloatTensor)
 	label_vis = torch.tensor(label_vis)#.type(device.FloatTensor)
 	return imgs, label, label_vis
+
+
+def gauss_filt(data): #[8, 3, 512, 512]
+	# mask
+	zzz=data.sum(1,True)
+	zzz[zzz>0]=1
+	mask = 1-zzz.repeat(1,3,1,1)
+	# generate gaussian noise
+	N,C,H,W = data.shape
+	mean = 128
+	var = 500
+	sigma = var**0.5
+	gauss = np.clip(np.around(np.random.normal(mean,sigma,(N,C,H,W)),decimals=0),0,255)
+	gauss = torch.from_numpy(gauss).type(device.FloatTensor)
+	# apply gaussian noise
+	ret = data + gauss * mask
+
+	return ret
 
 
 def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
@@ -86,8 +104,8 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 	iterno = 0
 	cb = [[None,None],[None,None]]
 	while True:
-		pred = net(data[:8])
-		loss = crit0(pred, label[:8])
+		pred = net(gauss_filt(data))
+		loss = crit0(pred, label)
 		# loss += crit1(pred_m, label)
 
 		optimizer.zero_grad()

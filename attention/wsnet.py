@@ -22,15 +22,15 @@ class WeaklySupNet(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(3, 32, (3, 3)),#, padding=(1,0)),
             nn.ReLU(),
-            nn.MaxPool2d(4),
-            nn.Conv2d(32, 64, (3, 3)),
+            nn.MaxPool2d(2),
+            nn.Conv2d(32, 32, (3, 3)),
             nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(64, 64, (3, 3))
+            nn.Conv2d(32, 32, (3, 3))
             
             )
-        self.rel = Relation(64,64,4)
-        self.linear_final = nn.Linear(128,nclass)
+        self.rel = Relation(32,32,4)
+        self.linear_final = nn.Linear(64,nclass)
         self.nclass = nclass
 
     def getHMgrad(self,grad):

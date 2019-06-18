@@ -25,12 +25,12 @@ class Relation(nn.Module):
         N,D,H,W = Q.shape
         Hf = self.ksize
         Wf = self.ksize
-        K_trans = im2col_indices(K,Hf,Wf,2) # (3200,38440)
+        K_trans = im2col_indices(K,Hf,Wf,2,1,1) # (3200,38440)
         Q_trans = Q.permute(1,2,3,0).contiguous().view(D,-1) # (128,38440)
         tmp = (K_trans.view(D,-1,K_trans.shape[-1])*Q_trans.unsqueeze(1)).view(self.nheads,self.hdim,Hf*Wf,-1)
         tmp = tmp.sum(1,True) # (4,1,5*5,38440)
         att = torch.softmax(tmp,2) # (4,32,25,38440)
-        V_trans = im2col_indices(V,Hf,Wf,2).view(self.nheads,self.hdim,Hf*Wf,-1)
+        V_trans = im2col_indices(V,Hf,Wf,2,1,1).view(self.nheads,self.hdim,Hf*Wf,-1)
         out = (V_trans*att).sum(2).view(D,H,W,N).permute(3,0,1,2)
         out = self.transform(out)
         return out
