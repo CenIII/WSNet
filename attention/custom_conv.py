@@ -13,20 +13,25 @@ class CustmConv(nn.Module):
         self.pad = int(kernel_size/2)*dilate
         self.dilate = dilate
         self.stride = stride
+        self.Wt = torch.nn.Parameter(data=torch.zeros(outchannel,inchannel,self.ksize,self.ksize), requires_grad=True)
+        self.Wt.data.uniform_(-1, 1)
+        self.b = torch.nn.Parameter(data=torch.zeros(outchannel,1), requires_grad=True)
 
     def forward(self,x): # NxDxHxW
         N,D,H,W = x.shape # 8,32,124,124
         Hf = self.ksize
         Wf = self.ksize
-        
+        # Suppose our X is 5x1x10x10, X_col will be a 9x500 matrix
+        X_col = im2col_indices(x, Hf, Wf, padding=self.pad, stride=self.stride, dilate=self.dilate)
+        # Suppose we have 20 of 3x3 filter: 20x1x3x3. W_col will be 20x9 matrix
+        W_col = self.Wt.reshape(self.outchannel, -1)
 
+        # 20x9 x 9x500 = 20x500
+        out = W_col @ X_col + self.b
 
-        K_trans = im2col_indices(K,Hf,Wf,padding=self.pad, stride=self.stride, dilate=self.dilate) # (3200,38440)
-        Q_trans = Q.permute(1,2,3,0).contiguous().view(D,-1) # (128,38440)
-        tmp = (K_trans.view(D,-1,K_trans.shape[-1])*Q_trans.unsqueeze(1)).view(self.nheads,self.hdim,Hf*Wf,-1)
-        tmp = tmp.sum(1,True) # (4,1,5*5,38440)
-        att = torch.softmax(tmp,2) # (4,32,25,38440)
-        V_trans = im2col_indices(V,Hf,Wf,padding=self.pad, stride=self.stride, dilate=self.dilate).view(self.nheads,self.hdim,Hf*Wf,-1)
-        out = (V_trans*att).sum(2).view(D,H,W,N).permute(3,0,1,2)
-        out = self.transform(out)
+        # Reshape back from 20x500 to 5x20x10x10
+        # i.e. for each of our 5 images, we have 20 results with size of 10x10
+        out = out.reshape(self.outchannel, H, W, self.outchannel)
+        out = out.transpose(3, 0, 1, 2)
+
         return out
