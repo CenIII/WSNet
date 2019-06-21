@@ -23,11 +23,12 @@ class WeaklySupNet(nn.Module):
             nn.Conv2d(3, 32, (3, 3)),#, padding=(1,0)),
             nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(32, 32, (3, 3)),
+            nn.Conv2d(32, 64, (3, 3)),
             nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(32, 32, (3, 3))
-            
+            nn.Conv2d(64, 64, (3, 3)),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, (3, 3))
             )
         self.rel = Relation(32,32,4)
         self.linear_final = nn.Linear(64,nclass)
@@ -48,8 +49,8 @@ class WeaklySupNet(nn.Module):
 
     def forward(self,x):
         feats = self.conv(x) #torch.Size([2, 16, 64, 64])
-        rel_feats = self.rel(feats)
-        feats = torch.cat((feats,rel_feats),dim=1)
+        # rel_feats = self.rel(feats)
+        # feats = torch.cat((feats,rel_feats),dim=1)
         self.feats = feats.permute(0,2,3,1)
         self.feats.register_hook(self.getHMgrad)
 

@@ -83,8 +83,8 @@ def gauss_filt(data): #[8, 3, 512, 512]
 	mean = 128
 	var = 500
 	sigma = var**0.5
-	gauss = np.clip(np.around(np.random.normal(mean,sigma,(N,C,H,W)),decimals=0),0,255)
-	gauss = torch.from_numpy(gauss).type(device.FloatTensor)
+	gauss = np.clip(np.around(np.random.normal(mean,sigma,(N,C,1,1)),decimals=0),0,255)
+	gauss = torch.from_numpy(gauss).type(device.FloatTensor).repeat(1,1,H,W)
 	# apply gaussian noise
 	ret = data + gauss * mask
 
