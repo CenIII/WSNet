@@ -73,7 +73,7 @@ def loadData():
 	return imgs, label, label_vis
 
 
-def gauss_filt(data): #[8, 3, 512, 512]
+def gauss_filt(data,label_vis): #[8, 3, 512, 512]
 	# mask
 	zzz=data.sum(1,True)
 	zzz[zzz>0]=1
@@ -88,7 +88,14 @@ def gauss_filt(data): #[8, 3, 512, 512]
 	# apply gaussian noise
 	ret = data + gauss * mask
 
-	return ret
+	# make mask for output cmap
+	o_size = 124
+	zzz=np.ceil(1-cv2.resize(mask.permute(2,3,1,0)[:,:,0,:].contiguous().view(512,512,-1).data.cpu().numpy(),(o_size,o_size))) # (60,60,8)
+	out_mask=torch.from_numpy(zzz).type(device.FloatTensor).permute(2,0,1) #(8,60,60)
+	zzz=out_mask.unsqueeze(3).repeat(1,1,1,2)
+	aaa=(1-label_vis)[:,None,None,None].repeat(1,o_size,o_size,1)
+	new_label=zzz.scatter_(3,aaa,0)
+	return ret, new_label
 
 
 def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
@@ -103,14 +110,15 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 	
 	iterno = 0
 	cb = [[None,None],[None,None]]
-	filtdata = gauss_filt(data)
+	filtdata, new_label = gauss_filt(data,label_vis)
 	while True:
-		if iterno==60:
+		if iterno%1000==0 and iterno>0:
 			with torch.no_grad():
 				net.drawDriftHeatMap(filtdata[5:6],label_vis[5])
 		pred = net(filtdata)
-		loss = crit0(pred, label)
-		# loss += crit1(pred_m, label)
+
+		# loss = crit0(pred, new_label)
+		loss = crit0(pred.view(8,-1), new_label.view(8,-1))
 
 		optimizer.zero_grad()
 		loss.backward()
