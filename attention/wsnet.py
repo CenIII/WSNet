@@ -10,7 +10,8 @@ if torch.cuda.is_available():
 else:
     import torch as device
 from .relation import Relation
-from .custom_conv import CustmConv
+from .custom_conv import CustmConv, CalibConv
+import matplotlib.pyplot as plt 
 
 class WeaklySupNet(nn.Module):
     """
@@ -22,16 +23,16 @@ class WeaklySupNet(nn.Module):
         super(WeaklySupNet,self).__init__()     
 
         self.conv = nn.Sequential(
-            CustmConv(3, 32, 3),
+            nn.Conv2d(3, 32, 3),
+            nn.ReLU(),
+            nn.MaxPool2d(4),
+            nn.Conv2d(32, 64, 3),
             nn.ReLU(),
             nn.MaxPool2d(2),
-            CustmConv(32, 64, 3),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            CustmConv(64, 64, 3),
-            nn.ReLU(),
-            CustmConv(64, 64, 3)
+            nn.Conv2d(64, 64, 3),
+            nn.ReLU()
             )
+        self.calib_conv = CalibConv(64, 64, 3, dilation=5)
         self.linear_final = nn.Linear(64,nclass)
         self.nclass = nclass
 
@@ -48,8 +49,25 @@ class WeaklySupNet(nn.Module):
         hm = torch.gather(self.heatmaps,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
         return hm
 
+    def drawDriftHeatMap(self,x,clss):
+        feats = self.conv(x)
+        feats, yofs, xofs = self.calib_conv.forward_mid(feats) # 1,124,124,9,64
+        cmap = self.linear_final(feats) # 1,124,124,9,2
+        # choose right cmap by clss
+        cmap2show = cmap[...,clss].squeeze()
+        # calculate drift measure
+        y_drift = (torch.abs(cmap2show)*yofs[None,None,:]).sum(2)/torch.abs(cmap2show).sum(2) # broadcast
+        x_drift = (torch.abs(cmap2show)*xofs[None,None,:]).sum(2)/torch.abs(cmap2show).sum(2) # broadcast
+        # plot drift heat map
+        drift_map = torch.sqrt(x_drift**2+y_drift**2)
+
+        plt.imshow(drift_map.data.cpu().numpy())
+        plt.show()
+
+
     def forward(self,x):
         feats = self.conv(x) #torch.Size([2, 16, 64, 64])
+        feats = self.calib_conv(feats)
         # rel_feats = self.rel(feats)
         # feats = torch.cat((feats,rel_feats),dim=1)
         self.feats = feats.permute(0,2,3,1)

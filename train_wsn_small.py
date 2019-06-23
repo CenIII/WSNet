@@ -83,8 +83,8 @@ def gauss_filt(data): #[8, 3, 512, 512]
 	mean = 128
 	var = 500
 	sigma = var**0.5
-	gauss = np.clip(np.around(np.random.normal(mean,sigma,(N,C,1,1)),decimals=0),0,255)
-	gauss = torch.from_numpy(gauss).type(device.FloatTensor).repeat(1,1,H,W)
+	gauss = np.clip(np.around(np.random.normal(mean,sigma,(int(N/2),C,1,1)),decimals=0),0,255)
+	gauss = torch.from_numpy(gauss).type(device.FloatTensor).repeat(2,1,H,W)
 	# apply gaussian noise
 	ret = data + gauss * mask
 
@@ -103,8 +103,12 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 	
 	iterno = 0
 	cb = [[None,None],[None,None]]
+	filtdata = gauss_filt(data)
 	while True:
-		pred = net(gauss_filt(data))
+		if iterno==60:
+			with torch.no_grad():
+				net.drawDriftHeatMap(filtdata[5:6],label_vis[5])
+		pred = net(filtdata)
 		loss = crit0(pred, label)
 		# loss += crit1(pred_m, label)
 
