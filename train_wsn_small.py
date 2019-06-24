@@ -105,7 +105,7 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 	cb = [[None,None],[None,None]]
 	filtdata = gauss_filt(data)
 	while True:
-		if iterno==60:
+		if iterno==1000:
 			with torch.no_grad():
 				net.drawDriftHeatMap(filtdata[5:6],label_vis[5])
 		pred = net(filtdata)

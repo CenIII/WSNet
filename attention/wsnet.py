@@ -32,8 +32,8 @@ class WeaklySupNet(nn.Module):
             nn.Conv2d(64, 64, 3),
             nn.ReLU()
             )
-        self.calib_conv = CalibConv(64, 64, 3, dilation=5)
-        self.linear_final = nn.Linear(64,nclass)
+        self.calib_conv = CalibConv(64, 64, 3, dilation=5,nclass=nclass)
+        # self.linear_final = nn.Linear(64,nclass)
         self.nclass = nclass
 
     def getHMgrad(self,grad):
@@ -51,32 +51,18 @@ class WeaklySupNet(nn.Module):
 
     def drawDriftHeatMap(self,x,clss):
         feats = self.conv(x)
-        feats, yofs, xofs = self.calib_conv.forward_mid(feats) # 1,124,124,9,64
-        cmap = self.linear_final(feats) # 1,124,124,9,2
-        # choose right cmap by clss
-        cmap2show = cmap[...,clss].squeeze()
-        # calculate drift measure
-        y_drift = (torch.abs(cmap2show)*yofs[None,None,:]).sum(2)/torch.abs(cmap2show).sum(2) # broadcast
-        x_drift = (torch.abs(cmap2show)*xofs[None,None,:]).sum(2)/torch.abs(cmap2show).sum(2) # broadcast
-        # plot drift heat map
-        drift_map = torch.sqrt(x_drift**2+y_drift**2)
-
-        plt.imshow(drift_map.data.cpu().numpy())
+        hm = self.calib_conv(feats) # 1,124,124,9,64
+        drift_map = self.calib_conv.drift_map
+        plt.imshow(drift_map[...,clss].data.cpu().numpy())
         plt.show()
 
 
     def forward(self,x):
         feats = self.conv(x) #torch.Size([2, 16, 64, 64])
-        feats = self.calib_conv(feats)
-        # rel_feats = self.rel(feats)
-        # feats = torch.cat((feats,rel_feats),dim=1)
-        self.feats = feats.permute(0,2,3,1)
-        self.feats.register_hook(self.getHMgrad)
-
-        pre_hm = self.linear_final(self.feats)
+        pre_hm = self.calib_conv(feats) # 4,124,124,2
+        self.calib_conv.feats.register_hook(self.getHMgrad)
         self.heatmaps = torch.log(1+F.relu(pre_hm)) #- 0.2*F.relu(-pre_hm)#torch.sqrt() 
-        
         # linear # softmax
-        pred = torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.feats.shape[0],-1,self.nclass),dim=1).squeeze()
+        pred = torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.calib_conv.feats.shape[0],-1,self.nclass),dim=1).squeeze()
         return pred
         
