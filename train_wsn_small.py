@@ -27,19 +27,19 @@ def visualize(net, label, fig, ax, cb, iterno):
 
 	# plot here
 	for i in range(len(ax[0])):
-		img = ax[0][i].imshow(hm[1+i*4])
+		img = ax[0][i].imshow(hm[1+i*2])
 		if cb[0][i] is not None:
 			cb[0][i].remove()
 		cb[0][i] = plt.colorbar(img,ax=ax[0][i])
 
-	hm = net.getGradAttention().data.cpu().numpy()
+	# hm = net.getGradAttention().data.cpu().numpy()
 
 	# plot here
-	for i in range(len(ax[1])):
-		img = ax[1][i].imshow(hm[1+i*4])
-		if cb[1][i] is not None:
-			cb[1][i].remove()
-		cb[1][i] = plt.colorbar(img,ax=ax[1][i])
+	# for i in range(len(ax[1])):
+	# 	img = ax[1][i].imshow(hm[1+i*2])
+	# 	if cb[1][i] is not None:
+	# 		cb[1][i].remove()
+	# 	cb[1][i] = plt.colorbar(img,ax=ax[1][i])
 
 	# hm = net.getAttention_m(label).data.cpu().numpy()
 	# for i in range(len(ax[2])):
@@ -86,7 +86,7 @@ def gauss_filt(data): #[8, 3, 512, 512]
 	gauss = np.clip(np.around(np.random.normal(mean,sigma,(int(N/2),C,1,1)),decimals=0),0,255)
 	gauss = torch.from_numpy(gauss).type(device.FloatTensor).repeat(2,1,H,W)
 	# apply gaussian noise
-	ret = data + gauss * mask
+	ret = data #+ gauss * mask
 
 	return ret
 
@@ -108,8 +108,9 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 		if iterno==1000:
 			with torch.no_grad():
 				net.drawDriftHeatMap(filtdata[5:6],label_vis[5])
-		pred = net(filtdata)
-		loss = crit0(pred, label)
+		idx = np.random.choice(8,4,replace=False)
+		pred = net(filtdata[idx])
+		loss = crit0(pred, label[idx])
 		# loss += crit1(pred_m, label)
 
 		optimizer.zero_grad()
@@ -118,7 +119,7 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 
 		if iterno%5==0:
 			# todo: visualize attention map
-			visualize(net,label_vis[:8],fig,ax,cb,iterno)
+			visualize(net,label_vis[idx],fig,ax,cb,iterno)
 		optimizer.step()
 		# time.sleep(0.1)
 		iterno += 1

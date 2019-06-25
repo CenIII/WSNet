@@ -116,14 +116,15 @@ class CalibConv(CustmConv):
         midres = (X_col_brk*W_col_brk).sum(1) + self.bias.unsqueeze(1) # 64, 9, 28800
         
         feats = midres.view(self.outchannel, Hf*Wf, H, W, N)
-        self.feats = feats.permute(4, 2, 3, 1, 0).contiguous() # 1,124,124,9,64
+        feats = feats.permute(4, 2, 3, 1, 0).contiguous() # 1,124,124,9,64
+        # self.feats = feats.sum(3)
 
         bound = (int(self.ksize/2))*self.dilation
 
         yofs = torch.from_numpy(np.repeat(np.arange(-bound,bound+1,self.dilation), self.ksize)).type(device.FloatTensor)
         xofs = torch.from_numpy(np.tile(np.arange(-bound,bound+1,self.dilation), self.ksize)).type(device.FloatTensor)
         
-        cmap = self.linear_final(self.feats) # 4,124,124,9,2
+        cmap = self.linear_final(feats) # 4,124,124,9,2
         # choose right cmap by clss
         # cmap2show = cmap[...,clss]
         # calculate drift measure
@@ -132,7 +133,7 @@ class CalibConv(CustmConv):
         # drift heat map
         self.drift_map = torch.sqrt(x_drift**2+y_drift**2) # 4,124,124,2
 
-        cmap_mod = cmap.sum(3) * torch.exp(-0.5*self.drift_map)
+        cmap_mod = cmap.sum(3) #* torch.exp(-0.1*self.drift_map)
 
         return cmap_mod
 

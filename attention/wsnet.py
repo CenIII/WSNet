@@ -25,7 +25,7 @@ class WeaklySupNet(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(3, 32, 3),
             nn.ReLU(),
-            nn.MaxPool2d(4),
+            nn.MaxPool2d(3),
             nn.Conv2d(32, 64, 3),
             nn.ReLU(),
             nn.MaxPool2d(2),
@@ -56,13 +56,12 @@ class WeaklySupNet(nn.Module):
         plt.imshow(drift_map[...,clss].data.cpu().numpy())
         plt.show()
 
-
     def forward(self,x):
         feats = self.conv(x) #torch.Size([2, 16, 64, 64])
         pre_hm = self.calib_conv(feats) # 4,124,124,2
-        self.calib_conv.feats.register_hook(self.getHMgrad)
-        self.heatmaps = torch.log(1+F.relu(pre_hm)) #- 0.2*F.relu(-pre_hm)#torch.sqrt() 
+        # self.calib_conv.feats.register_hook(self.getHMgrad)
+        self.heatmaps = pre_hm#F.leaky_relu(pre_hm)#torch.log(1+F.relu(pre_hm)) #- 0.2*F.relu(-pre_hm)#torch.sqrt() 
         # linear # softmax
-        pred = torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm)).view(self.calib_conv.feats.shape[0],-1,self.nclass),dim=1).squeeze()
+        pred = torch.mean((self.heatmaps).view(x.shape[0],-1,self.nclass),dim=1).squeeze() #- 0.12*F.relu(-pre_hm)
         return pred
         
