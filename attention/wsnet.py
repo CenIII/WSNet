@@ -9,7 +9,8 @@ if torch.cuda.is_available():
     import torch.cuda as device
 else:
     import torch as device
-from .relation import Relation
+from .relation import Relation, Diffusion
+
 class WeaklySupNet(nn.Module):
     """
     The class is an implementation of the paper A Structured Self-Attentive Sentence Embedding including regularization
@@ -22,20 +23,20 @@ class WeaklySupNet(nn.Module):
         self.backbone = nn.Sequential(
             nn.Conv2d(3, 32, (5, 5)),#, padding=(1,0)),
             nn.ReLU(),
-            nn.MaxPool2d(2),
+            nn.MaxPool2d(3),
             nn.Conv2d(32, 64, (3, 3)),
             nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Conv2d(64, 64, (3, 3)),
             nn.ReLU()
             )
-        self.diffuse = Diffusion(32,32,4)
+        self.diffuse = Diffusion(64,16,1)
         self.feature = nn.Sequential(
-            nn.Conv2d(64, 64, (3, 3)),
+            nn.Conv2d(64, 64, (3, 3),padding=1),
             nn.ReLU()
             ) 
         self.cmap0 = nn.Linear(64,nclass)
-        self.transform = nn.Conv2d(64,64,(3,3))
+        self.transform = nn.Conv2d(64,64,(3,3),padding=1)
         self.cmap1 = nn.Linear(64,nclass)
         self.nclass = nclass
 
@@ -58,7 +59,7 @@ class WeaklySupNet(nn.Module):
         K,Q = self.diffuse(bb)
         feats0_trans = self.diffuse.transfer(feats0)
 
-        feats1 = self.transform(torch.cat((feats0,feats0_trans),dim=1))
+        feats1 = self.transform(feats0_trans) #torch.cat((feats0,feats0_trans),dim=1)
         pre_hm1 = self.cmap1(feats1.permute(0,2,3,1))
         self.heatmaps = torch.log(1+F.relu(pre_hm0))
         pred1 = torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm1)).view(x.shape[0],-1,self.nclass),dim=1).squeeze()

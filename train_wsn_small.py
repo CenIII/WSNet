@@ -27,7 +27,7 @@ def visualize(net, label, fig, ax, cb, iterno):
 
 	# plot here
 	for i in range(len(ax[0])):
-		img = ax[0][i].imshow(hm[1+i*2])
+		img = ax[0][i].imshow(hm[1+i*4])
 		if cb[0][i] is not None:
 			cb[0][i].remove()
 		cb[0][i] = plt.colorbar(img,ax=ax[0][i])
@@ -83,8 +83,8 @@ def gauss_filt(data): #[8, 3, 512, 512]
 	mean = 128
 	var = 1000
 	sigma = var**0.5
-	gauss = np.clip(np.around(np.random.normal(mean,sigma,(N,C,1,1)),decimals=0),0,255)
-	gauss = torch.from_numpy(gauss).type(device.FloatTensor).repeat(1,1,H,W)
+	gauss = np.clip(np.around(np.random.normal(mean,sigma,(int(N/2),C,1,1)),decimals=0),0,255)
+	gauss = torch.from_numpy(gauss).type(device.FloatTensor).repeat(2,1,H,W)
 	# apply gaussian noise
 	ret = data + gauss * mask
 	ret = (ret-128.)/255.
@@ -106,7 +106,8 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 	cb = [[None,None],[None,None]]
 	filt_data = gauss_filt(data)
 	while True:
-		idx = np.random.choice(8,4)
+		
+		idx = np.arange(8)#np.random.choice(8,8,replace=False)
 		pred,pred1,_,_ = net(filt_data[idx])
 		loss = crit0(pred, label[idx])
 		loss += crit0(pred1, label[idx])

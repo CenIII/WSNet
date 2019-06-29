@@ -36,7 +36,7 @@ class Relation(nn.Module):
         return out
 
 class Diffusion(nn.Module):
-    def __init__(self,inchannel,outchannel,nheads=1,kernel_size=3,dilation=4):
+    def __init__(self,inchannel,outchannel,nheads=1,kernel_size=3,dilation=9):
         super(Diffusion,self).__init__()  
         assert(outchannel%nheads==0)
         self.inchannel = inchannel
@@ -47,15 +47,16 @@ class Diffusion(nn.Module):
         self.dilation = dilation
         self.padding = int(self.ksize/2)*dilation
         self.qk = nn.Sequential(
-            nn.Conv2d(inchannel, inchannel, (3, 3)),#, padding=(1,0)),
+            nn.Conv2d(inchannel, inchannel, (3,3),padding=1),#, padding=(1,0)),
             nn.ReLU(),
-            nn.Conv2d(inchannel,int(2*outchannel),(3,3),bias=False) # q k v
+            nn.Conv2d(inchannel,int(2*outchannel),(3,3),padding=1) # q k v
             )
 
     # transfer get v and gen new v
     def transfer(self,V):
         # local attention
         N,D,H,W = self.Q.shape # 8,32,124,124
+        Dv = V.shape[1]
         Hf = self.ksize
         Wf = self.ksize
         K_trans = im2col_indices(self.K,Hf,Wf,self.padding,1,self.dilation) # (800,123008)
@@ -63,10 +64,10 @@ class Diffusion(nn.Module):
         tmp = (K_trans.view(D,-1,K_trans.shape[-1])*Q_trans.unsqueeze(1)).view(self.nheads,self.hdim,Hf*Wf,-1)
         tmp = tmp.sum(1,True) # (4,1,5*5,123008)
         att = torch.softmax(tmp,2) # (4,1,25,123008)
-        V_trans = V.permute(1,2,3,0).contiguous().view(self.nheads,self.hdim,1,H*W*N) # (4,hdim,1,123008)
+        V_trans = V.permute(1,2,3,0).contiguous().view(self.nheads,int(Dv/self.nheads),1,H*W*N) # (4,hdim,1,123008)
         # how to add back?
-        V_cols = (V_trans*att).view(self.nheads*self.hdim*Hf*Wf,-1) # (nheads*hdim*25,123008)
-        V_new = col2im_indices(V_cols,Hf,Wf,self.padding,1,self.dilation)
+        V_cols = (V_trans*att).view(Dv*Hf*Wf,-1) # (nheads*hdim*25,123008)
+        V_new = col2im_indices(V_cols,V.shape,Hf,Wf,self.padding,1,self.dilation)
         return V_new
 
     # forward get KQ
