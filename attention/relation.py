@@ -8,7 +8,7 @@ if torch.cuda.is_available():
 else:
 	import torch as device
 class Relation(nn.Module):
-    def __init__(self,inchannel,outchannel,nheads,kernel_size=5):
+    def __init__(self,inchannel,outchannel,nheads,kernel_size=3,dilation=6):
         super(Relation,self).__init__()  
         assert(outchannel%nheads==0)
         self.inchannel = inchannel
@@ -16,8 +16,10 @@ class Relation(nn.Module):
         self.nheads = nheads
         self.hdim = int(outchannel/nheads)
         self.ksize = kernel_size
-        self.qkv = nn.Conv2d(inchannel,int(3*outchannel),(1,1),bias=False) # q k v
-        self.transform = nn.Conv2d(outchannel,outchannel,(1,1),bias=False)
+        self.dilation = dilation
+        self.padding = int(self.ksize/2)*self.dilation
+        self.qkv = nn.Conv2d(inchannel,int(3*outchannel),(1,1)) # q k v
+        self.transform = nn.Conv2d(outchannel,outchannel,(1,1))
 
     def forward(self,x): # NxDxHxW
         qkv = self.qkv(x)
@@ -28,12 +30,12 @@ class Relation(nn.Module):
         N,D,H,W = Q.shape # 8,32,124,124
         Hf = self.ksize
         Wf = self.ksize
-        K_trans = im2col_indices(K,Hf,Wf,2,1,1) # (3200,38440)
+        K_trans = im2col_indices(K,Hf,Wf,self.padding,1,self.dilation) # (3200,38440)
         Q_trans = Q.permute(1,2,3,0).contiguous().view(D,-1) # (128,38440)
         tmp = (K_trans.view(D,-1,K_trans.shape[-1])*Q_trans.unsqueeze(1)).view(self.nheads,self.hdim,Hf*Wf,-1)
         tmp = tmp.sum(1,True) # (4,1,5*5,38440)
         att = torch.softmax(tmp,2) # (4,32,25,38440)
-        V_trans = im2col_indices(V,Hf,Wf,2,1,1).view(self.nheads,self.hdim,Hf*Wf,-1)
+        V_trans = im2col_indices(V,Hf,Wf,self.padding,1,self.dilation).view(self.nheads,self.hdim,Hf*Wf,-1)
         out = (V_trans*att).sum(2).view(D,H,W,N).permute(3,0,1,2)
         out = self.transform(out)
         return out
