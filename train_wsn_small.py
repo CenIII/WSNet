@@ -32,14 +32,15 @@ def visualize(net, label, fig, ax, cb, iterno):
 			cb[0][i].remove()
 		cb[0][i] = plt.colorbar(img,ax=ax[0][i])
 
-	# hm = net.getGradAttention().data.cpu().numpy()
+	
 
-	# # plot here
-	# for i in range(len(ax[1])):
-	# 	img = ax[1][i].imshow(hm[1+i*4])
-	# 	if cb[1][i] is not None:
-	# 		cb[1][i].remove()
-	# 	cb[1][i] = plt.colorbar(img,ax=ax[1][i])
+	# plot here
+	for i in range(len(ax[1])):
+		hm = net.diffuse.drawDiffuseMap(1+i*4).data.cpu().numpy()
+		img = ax[1][i].imshow(hm)
+		if cb[1][i] is not None:
+			cb[1][i].remove()
+		cb[1][i] = plt.colorbar(img,ax=ax[1][i])
 
 	# hm = net.getAttention_m(label).data.cpu().numpy()
 	# for i in range(len(ax[2])):
@@ -108,7 +109,7 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 	while True:
 		
 		idx = np.arange(8)#np.random.choice(8,8,replace=False)
-		pred,pred1,_,_ = net(filt_data[idx])
+		pred,pred1,_,_ = net(filt_data[idx],label_vis[idx])
 		loss = crit0(pred, label[idx])
 		loss += crit0(pred1, label[idx])
 

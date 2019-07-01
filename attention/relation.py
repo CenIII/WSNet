@@ -3,7 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from utils.tools import im2col_indices, col2im_indices
-
+if torch.cuda.is_available():
+	import torch.cuda as device
+else:
+	import torch as device
 class Relation(nn.Module):
     def __init__(self,inchannel,outchannel,nheads,kernel_size=5):
         super(Relation,self).__init__()  
@@ -36,7 +39,7 @@ class Relation(nn.Module):
         return out
 
 class Diffusion(nn.Module):
-    def __init__(self,inchannel,outchannel,nheads=1,kernel_size=3,dilation=9):
+    def __init__(self,inchannel,outchannel,nheads=1,kernel_size=3,dilation=6):
         super(Diffusion,self).__init__()  
         assert(outchannel%nheads==0)
         self.inchannel = inchannel
@@ -46,14 +49,38 @@ class Diffusion(nn.Module):
         self.ksize = kernel_size
         self.dilation = dilation
         self.padding = int(self.ksize/2)*dilation
-        self.qk = nn.Sequential(
+        self.k = nn.Sequential(
             nn.Conv2d(inchannel, inchannel, (3,3),padding=1),#, padding=(1,0)),
             nn.ReLU(),
-            nn.Conv2d(inchannel,int(2*outchannel),(3,3),padding=1) # q k v
+            nn.Conv2d(inchannel, outchannel,(3,3),padding=1) # q k v
+            )
+        self.q = nn.Sequential(
+            nn.Conv2d(inchannel, inchannel, (3,3),padding=1),#, padding=(1,0)),
+            nn.ReLU(),
+            nn.Conv2d(inchannel, outchannel,(3,3),padding=6,dilation=dilation) # q k v
             )
 
+    def drawDiffuseMap(self,n):
+        N,D,H,W = self.Q.shape
+        attmap = self.att[0].squeeze().view(self.ksize*self.ksize,H,W,N)[...,n] #(9,124,124)
+        bound = (int(self.ksize/2))*self.dilation
+
+        yofs = torch.from_numpy(np.repeat(np.arange(-bound,bound+1,self.dilation), self.ksize)).type(device.FloatTensor)
+        xofs = torch.from_numpy(np.tile(np.arange(-bound,bound+1,self.dilation), self.ksize)).type(device.FloatTensor)
+        
+        # calculate drift measure
+        y_drift = (torch.abs(attmap)*yofs[:,None,None]).sum(0)#/torch.abs(attmap).sum(2) # broadcast
+        x_drift = (torch.abs(attmap)*xofs[:,None,None]).sum(0)#/torch.abs(attmap).sum(2) # broadcast
+        # plot drift heat map
+        drift_map = torch.sqrt(x_drift**2+y_drift**2)
+
+        # plt.figure(2)
+        # plt.imshow(drift_map.data.cpu().numpy())
+        # plt.show()
+        return drift_map
+
     # transfer get v and gen new v
-    def transfer(self,V):
+    def transfer(self,V,soft_mask,label):
         # local attention
         N,D,H,W = self.Q.shape # 8,32,124,124
         Dv = V.shape[1]
@@ -63,16 +90,22 @@ class Diffusion(nn.Module):
         Q_trans = self.Q.permute(1,2,3,0).contiguous().view(D,-1) # (32,123008)
         tmp = (K_trans.view(D,-1,K_trans.shape[-1])*Q_trans.unsqueeze(1)).view(self.nheads,self.hdim,Hf*Wf,-1)
         tmp = tmp.sum(1,True) # (4,1,5*5,123008)
-        att = torch.softmax(tmp,2) # (4,1,25,123008)
+        self.att = torch.softmax(tmp,2) # (4,1,25,123008)
+        # todo: use soft mask to att
+        mask = torch.gather(soft_mask,3,label[:,None,None,None].repeat(1,soft_mask.shape[1],soft_mask.shape[2],1)).squeeze().detach() # (8,81,81)
+        mask_norm = mask/torch.clamp(torch.max(mask.view(N,-1),dim=1)[0],1.)[:,None,None]
+
+        mask = mask_norm.permute(1,2,0).contiguous().view(-1)
+        self.att = self.att*mask[None,None,None,:] 
+
         V_trans = V.permute(1,2,3,0).contiguous().view(self.nheads,int(Dv/self.nheads),1,H*W*N) # (4,hdim,1,123008)
         # how to add back?
-        V_cols = (V_trans*att).view(Dv*Hf*Wf,-1) # (nheads*hdim*25,123008)
+        V_cols = (V_trans*self.att).view(Dv*Hf*Wf,-1) # (nheads*hdim*25,123008)
         V_new = col2im_indices(V_cols,V.shape,Hf,Wf,self.padding,1,self.dilation)
         return V_new
 
     # forward get KQ
     def forward(self,x): # NxDxHxW
-        qk = self.qk(x)
-        self.Q = qk[:,:self.outchannel]
-        self.K = qk[:,self.outchannel:(2*self.outchannel)]
+        self.K = self.k(x)
+        self.Q = self.q(x)
         return self.Q, self.K

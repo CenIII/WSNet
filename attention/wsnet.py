@@ -30,13 +30,13 @@ class WeaklySupNet(nn.Module):
             nn.Conv2d(64, 64, (3, 3)),
             nn.ReLU()
             )
-        self.diffuse = Diffusion(64,16,1)
+        self.diffuse = Diffusion(64,16,4)
         self.feature = nn.Sequential(
             nn.Conv2d(64, 64, (3, 3),padding=1),
             nn.ReLU()
             ) 
         self.cmap0 = nn.Linear(64,nclass)
-        self.transform = nn.Conv2d(64,64,(3,3),padding=1)
+        self.transform = nn.Conv2d(128,64,(3,3),padding=1)
         self.cmap1 = nn.Linear(64,nclass)
         self.nclass = nclass
 
@@ -48,7 +48,7 @@ class WeaklySupNet(nn.Module):
         hm = torch.gather(self.heatmaps,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
         return hm
 
-    def forward(self,x):
+    def forward(self,x,label):
         bb = self.backbone(x) #torch.Size([2, 16, 64, 64])
         feats0 = self.feature(bb)
 
@@ -57,9 +57,9 @@ class WeaklySupNet(nn.Module):
         pred0 = torch.mean((heatmaps0 - 0.12*F.relu(-pre_hm0)).view(x.shape[0],-1,self.nclass),dim=1).squeeze()
 
         K,Q = self.diffuse(bb)
-        feats0_trans = self.diffuse.transfer(feats0)
+        feats0_trans = self.diffuse.transfer(feats0,heatmaps0,label)
 
-        feats1 = self.transform(feats0_trans) #torch.cat((feats0,feats0_trans),dim=1)
+        feats1 = self.transform(torch.cat((feats0,feats0_trans),dim=1)) #torch.cat((feats0,feats0_trans),dim=1)
         pre_hm1 = self.cmap1(feats1.permute(0,2,3,1))
         self.heatmaps = torch.log(1+F.relu(pre_hm0))
         pred1 = torch.mean((self.heatmaps - 0.12*F.relu(-pre_hm1)).view(x.shape[0],-1,self.nclass),dim=1).squeeze()
