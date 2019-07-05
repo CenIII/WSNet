@@ -8,7 +8,7 @@ def multilabel_soft_pull_loss(input, target, weight=None,reduction='mean'):
     # if size_average is not None or reduce is not None:
     #     reduction = _Reduction.legacy_get_string(size_average, reduce)
 
-    loss = -(target * torch.log(torch.sigmoid((input)))) #+ (1 - target) * logsigmoid(-input))
+    loss = -(torch.log(torch.sigmoid((input)))) # target *  #+ (1 - target) * logsigmoid(-input))
 
     if weight is not None:
         loss = loss * weight
