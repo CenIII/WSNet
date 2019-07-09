@@ -35,20 +35,20 @@ def visualize(net, label, fig, ax, cb, iterno):
 	
 
 	# plot here
-	for i in range(len(ax[1])):
-		hm = net.diffuse.drawDiffuseMap(1+i*4).data.cpu().numpy()
-		img = ax[1][i].imshow(hm)
-		if cb[1][i] is not None:
-			cb[1][i].remove()
-		cb[1][i] = plt.colorbar(img,ax=ax[1][i])
+	# for i in range(len(ax[1])):
+	# 	hm = net.diffuse.drawDiffuseMap(1+i*4).data.cpu().numpy()
+	# 	img = ax[1][i].imshow(hm)
+	# 	if cb[1][i] is not None:
+	# 		cb[1][i].remove()
+	# 	cb[1][i] = plt.colorbar(img,ax=ax[1][i])
 	
 
-	hm = net.getTMask().data.cpu().numpy()
-	for i in range(len(ax[2])):
-		img = ax[2][i].imshow(hm[1+i*4])
-		if cb[2][i] is not None:
-			cb[2][i].remove()
-		cb[2][i] = plt.colorbar(img,ax=ax[2][i])
+	# hm = net.getRelHm(label).data.cpu().numpy()
+	# for i in range(len(ax[2])):
+	# 	img = ax[2][i].imshow(hm[1+i*4])
+	# 	if cb[2][i] is not None:
+	# 		cb[2][i].remove()
+	# 	cb[2][i] = plt.colorbar(img,ax=ax[2][i])
 	
 	# get 8th image's both heatmaps
 	# hm = net.heatmaps[8].data.cpu().numpy()
@@ -111,19 +111,23 @@ def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 		if iterno%10==0:
 			indlist = np.random.choice(10,10,replace=False)
 		idx = np.arange(8)#np.random.choice(8,8,replace=False)
-		pred,pred1,pred_tmask,_,_ = net(filt_data[indlist[iterno%10]][idx],label_vis[idx])
+		pred,pred1,pred2,_,_ = net(filt_data[indlist[iterno%10]][idx],label_vis[idx],norm_att=False) #,pred_tmask
 		loss = crit0(pred, label[idx])
 		loss += crit0(pred1, label[idx])
-		loss += crit1(pred_tmask, None)
+		loss += crit0(pred2, label[idx])
+		# loss += crit1(pred_tmask, None)
 		optimizer.zero_grad()
 		loss.backward()
 		print('iterno='+str(iterno)+', loss='+str(loss))
-
-		if iterno%5==0:
-			# todo: visualize attention map
-			visualize(net,label_vis[idx],fig,ax,cb,iterno)
+		
 		optimizer.step()
 		# time.sleep(0.1)
+		if iterno%5==0:
+    			# todo: visualize attention map
+			# with torch.no_grad():
+			# 	net.infer(filt_data[indlist[iterno%10]][idx],label_vis[idx],norm_att=True)
+			visualize(net,label_vis[idx],fig,ax,cb,iterno)
+			
 		iterno += 1
 
 
