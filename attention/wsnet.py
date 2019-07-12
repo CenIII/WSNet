@@ -40,15 +40,12 @@ class WeaklySupNet(nn.Module):
             nn.ReLU()
             ) 
         self.cmap0 = nn.Linear(64,nclass)
-        self.transform = nn.Conv2d(128,64,(3,3),padding=1)
+        self.transform = nn.Conv2d(64,64,(3,3),padding=1)
         self.cmap1 = nn.Linear(64,nclass,bias=False)
         self.cmap2 = nn.Linear(64,nclass)
         self.tmasknet = nn.Linear(64,1)
         self.nclass = nclass
 
-    def getGradAttention(self):
-        hm = torch.abs(self.hmgrad[:,:,:,0])
-        return hm
     def getAttention(self,classid):
         zzz = classid[:,None,None,None].repeat(1,self.heatmaps.shape[1],self.heatmaps.shape[2],1)
         hm = torch.gather(self.heatmaps,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
@@ -73,18 +70,11 @@ class WeaklySupNet(nn.Module):
         heatmaps0 = torch.log(1+F.relu(pre_hm0))
         pred0 = torch.mean((heatmaps0 - 0.12*F.relu(-pre_hm0)).view(x.shape[0],-1,self.nclass),dim=1).squeeze()
 
-        # target mask 
-        # pre_tmask = self.tmasknet(feats0.detach().permute(0,2,3,1))
-        # tmask = torch.log(1+F.relu(pre_tmask))
-        # norm_tmask = self.normTMask(tmask)
-        # self.tmask = norm_tmask
-        # pred_tmask = torch.mean((tmask - 0.12*F.relu(-pre_tmask)).view(x.shape[0],-1,1),dim=1)
-
         K,Q = self.diffuse(bb)
-        feats0_trans = self.diffuse.transfer(feats0,heatmaps0,label,6,norm_att=norm_att) #norm_tmask,
+        feats0_trans = self.diffuse.transfer(feats0,label,6,norm_att=norm_att) #norm_tmask,
         # feats0_trans += self.diffuse.transfer(feats0,heatmaps0,label,3,norm_att=norm_att)
 
-        feats1 = self.transform(torch.cat((feats0,feats0_trans),dim=1)) #torch.cat((feats0,feats0_trans),dim=1)
+        feats1 = self.transform(feats0_trans)#torch.cat((feats0,feats0_trans),dim=1)) #torch.cat((feats0,feats0_trans),dim=1)
         pre_hm1 = self.cmap1(feats1.permute(0,2,3,1))
         self.heatmaps = pre_hm1 #torch.log(1+F.relu(pre_hm1))
         pred1 = torch.mean((self.heatmaps).view(x.shape[0],-1,self.nclass),dim=1).squeeze()  # - 0.12*F.relu(-pre_hm1)
@@ -95,20 +85,4 @@ class WeaklySupNet(nn.Module):
         pred2 = torch.mean((self.heatmaps2).view(x.shape[0],-1,self.nclass),dim=1).squeeze() # - 0.12*F.relu(-pre_hm2)
         
         return pred0, pred1, pred2, K, self.heatmaps #pred_tmask,
-        
-    def infer(self,x,label,norm_att=False):
-        bb = self.backbone(x) #torch.Size([2, 16, 64, 64])
-        feats0 = self.feature(bb)
-
-        pre_hm0 = self.cmap0(feats0.permute(0,2,3,1))
-        heatmaps0 = torch.log(1+F.relu(pre_hm0))
-        pred0 = torch.mean((heatmaps0 - 0.12*F.relu(-pre_hm0)).view(x.shape[0],-1,self.nclass),dim=1).squeeze()
-
-        K,Q = self.diffuse(bb)
-        feats0_trans = self.diffuse.transfer(feats0,heatmaps0,label,6,norm_att=norm_att) #norm_tmask,
-        # feats0_trans += self.diffuse.transfer(feats0,heatmaps0,label,3,norm_att=norm_att)
-
-        feats1 = self.transform(torch.cat((feats0,feats0_trans),dim=1)) #torch.cat((feats0,feats0_trans),dim=1)
-        pre_hm1 = self.cmap1(feats1.permute(0,2,3,1))
-        self.heatmaps = pre_hm1 #torch.log(1+F.relu(pre_hm1))
-        # return heatmaps
+    
