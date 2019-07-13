@@ -23,7 +23,7 @@ import matplotlib
 matplotlib.use('tkagg')
 
 def visualize(net, label, fig, ax, cb, iterno):
-	hm = net.getAttention(label).data.cpu().numpy()
+	hm = net.getHeatmaps(label).data.cpu().numpy()
 
 	# plot here
 	for i in range(len(ax[0])):
@@ -111,11 +111,18 @@ def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 		if iterno%10==0:
 			indlist = np.random.choice(10,10,replace=False)
 		idx = np.arange(8)#np.random.choice(8,8,replace=False)
-		pred,pred1,pred2,_,_ = net(filt_data[indlist[iterno%10]][idx],label_vis[idx],norm_att=False) #,pred_tmask
-		loss = crit0(pred, label[idx])
-		loss += crit0(pred1, label[idx])
-		loss += crit0(pred2, label[idx])
-		# loss += crit1(pred_tmask, None)
+		preds, pred0 = net(filt_data[indlist[iterno%10]][idx]) #,pred_tmask
+		loss = []
+		cnt = 0
+		for pred in preds:
+			tmp = crit0(pred, label[idx])
+			if cnt==0:
+				tmp = 2*tmp
+			loss.append(tmp)
+			cnt+=1
+
+		loss = torch.sum(torch.stack(loss))
+		loss = loss + crit0(pred0, label[idx])
 		optimizer.zero_grad()
 		loss.backward()
 		print('iterno='+str(iterno)+', loss='+str(loss))
