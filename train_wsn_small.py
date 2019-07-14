@@ -2,10 +2,8 @@
 high level support for doing this and that.
 """
 import torch
-from torch.autograd import Variable
 import tqdm
 import numpy as np
-from utils.loss import multilabel_soft_pull_loss
 
 if torch.cuda.is_available():
 	import torch.cuda as device
@@ -13,7 +11,7 @@ else:
 	import torch as device
 
 import time
-from attention.wsnet import WeaklySupNet#, Criterion
+from nets.wsnet import WeaklySupNet
 
 import os
 import matplotlib.pyplot as plt
@@ -31,8 +29,6 @@ def visualize(net, label, fig, ax, cb, iterno):
 		if cb[0][i] is not None:
 			cb[0][i].remove()
 		cb[0][i] = plt.colorbar(img,ax=ax[0][i])
-
-	
 
 	# plot here
 	# for i in range(len(ax[1])):

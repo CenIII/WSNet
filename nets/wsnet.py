@@ -4,17 +4,17 @@ high level support for doing this and that.
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from torch.nn.utils import weight_norm
+from .modules import Gap, KQ, Bayes
+
 if torch.cuda.is_available():
     import torch.cuda as device
 else:
     import torch as device
-from .relation import Gap, KQ, Bayes
+    
 
 class WeaklySupNet(nn.Module):
     """
-    The class is an implementation of the paper A Structured Self-Attentive Sentence Embedding including regularization
-    and without pruning. Slight modifications have been done for speedup
+    An end-to-end semantic segmentation net via cross-entropy loss only. 
     """
    
     def __init__(self,nclass):
