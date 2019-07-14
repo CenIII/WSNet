@@ -83,7 +83,7 @@ def gauss_filt(data): #[8, 3, 512, 512]
 	# generate gaussian noise
 	N,C,H,W = data.shape
 	mean = 128
-	var = 1000
+	var = 2000
 	sigma = var**0.5
 	gauss = np.clip(np.around(np.random.normal(mean,sigma,(int(N/2),C,1,1)),decimals=0),0,255)
 	gauss = torch.from_numpy(gauss).type(device.FloatTensor).repeat(2,1,H,W)
@@ -94,47 +94,36 @@ def gauss_filt(data): #[8, 3, 512, 512]
 	return ret
 
 
-def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
+def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 	if torch.cuda.is_available():
 		data = data.cuda()
 		net = net.cuda()
 		crit0 = crit0.cuda()
-		# crit1 = crit1.cuda()
 		label = label.cuda()
 		label_vis = label_vis.cuda()
+
 	fig, ax = plt.subplots(nrows=3, ncols=2)
 	
 	iterno = 0
 	cb = [[None,None],[None,None],[None,None]]
-	filt_data = [gauss_filt(data) for i in range(10)]
+	filt_data = [gauss_filt(data) for i in range(5)]
 	while True:
-		if iterno%10==0:
-			indlist = np.random.choice(10,10,replace=False)
-		idx = np.arange(8)#np.random.choice(8,8,replace=False)
-		preds, pred0 = net(filt_data[indlist[iterno%10]][idx]) #,pred_tmask
+		if iterno%1==0:
+			indlist = np.random.choice(5,5,replace=False)
+		idx = np.arange(8)
+		preds, pred0 = net(filt_data[indlist[iterno%5]][idx],label_vis[idx]) #,pred_tmask
 		loss = []
-		cnt = 0
 		for pred in preds:
 			tmp = crit0(pred, label[idx])
-			if cnt==0:
-				tmp = 2*tmp
 			loss.append(tmp)
-			cnt+=1
-
-		loss = torch.sum(torch.stack(loss))
-		loss = loss + crit0(pred0, label[idx])
+		loss.append(crit0(pred0, label[idx]))
+		loss = sum(loss)
 		optimizer.zero_grad()
 		loss.backward()
 		print('iterno='+str(iterno)+', loss='+str(loss))
-		
 		optimizer.step()
-		# time.sleep(0.1)
 		if iterno%5==0:
-    			# todo: visualize attention map
-			# with torch.no_grad():
-			# 	net.infer(filt_data[indlist[iterno%10]][idx],label_vis[idx],norm_att=True)
 			visualize(net,label_vis[idx],fig,ax,cb,iterno)
-			
 		iterno += 1
 
 
@@ -144,6 +133,5 @@ if __name__ == '__main__':
 	net = WeaklySupNet(nclass=2)
 	optimizer = torch.optim.Adam(net.parameters(),lr=0.001)
 	crit0 = torch.nn.MultiLabelSoftMarginLoss()
-	crit1 = multilabel_soft_pull_loss
 	data, label, label_vis = loadData()
-	train(net, data, label, label_vis, optimizer, crit0, crit1)
+	train(net, data, label, label_vis, optimizer, crit0)

@@ -9,7 +9,7 @@ if torch.cuda.is_available():
     import torch.cuda as device
 else:
     import torch as device
-from .relation import Relation, Diffusion, Gap, Bayes
+from .relation import Relation, Diffusion, Gap, KQ, Bayes
 
 class WeaklySupNet(nn.Module):
     """
@@ -21,7 +21,7 @@ class WeaklySupNet(nn.Module):
         super(WeaklySupNet,self).__init__()     
         kq_dim = 16
         self.backbone = nn.Sequential(
-            nn.Conv2d(3, 32, (5, 5)),#, padding=(1,0)),
+            nn.Conv2d(3, 32, (5, 5)),
             nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(3),
@@ -33,23 +33,9 @@ class WeaklySupNet(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU()
             )
-        self.k = nn.Sequential(
-            nn.Conv2d(64, 64, (1,1)),#,padding=1),#, padding=(1,0)),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.Conv2d(64, kq_dim,(1,1)),#,padding=1) # q k v
-            )
-        self.q = nn.Sequential(
-            nn.Conv2d(64, 64, (1,1)),#,padding=1),#, padding=(1,0)),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.Conv2d(64, 16,(1,1)),#,padding=1)#6,dilation=dilation) # q k v
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.Conv2d(16, kq_dim,(1,1)),
-            )
+        self.kq = KQ(64,kq_dim)
         self.feature = nn.Sequential(
-            nn.Conv2d(64, 64, (3,3),padding=1),#, padding=(1,0)),
+            nn.Conv2d(64, 64, (3,3),padding=1),
             nn.ReLU()
         )
         self.bayes = Bayes(64,kq_dim,2,n_heads=1,dif_pattern=[(3,6)],rel_pattern=[(5,3)])
@@ -61,13 +47,11 @@ class WeaklySupNet(nn.Module):
         hm = torch.gather(self.gap.heatmaps,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
         return hm
 
-    def forward(self,x):
+    def forward(self,x,label):
         bb = self.backbone(x)
-        K = self.k(bb)
-        Q = self.q(bb)
+        K,Q = self.kq(bb)
         feats = self.feature(bb)
-        feats1, preds1 = self.bayes(feats,K,Q)
+        feats1, preds1 = self.bayes(feats,K,Q,label)
         pred = self.gap(feats1,save_hm=True)
-        # preds1.append(pred)
         return preds1, pred
     
