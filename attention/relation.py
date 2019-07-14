@@ -70,9 +70,9 @@ class KQ(nn.Module):
         return K,Q
 
     
-class Relation(nn.Module):
+class Infusion(nn.Module):
     def __init__(self,v_dim,kq_dim,n_heads=1,kernel_size=5,dilation=3):
-        super(Relation,self).__init__()  
+        super(Infusion,self).__init__()  
         assert(v_dim%n_heads==0)
         assert(kq_dim%n_heads==0)
         self.v_dim = v_dim
@@ -154,7 +154,7 @@ class Bayes(nn.Module):
         self.gap = Gap(in_channels,n_class)
         self.gap_r = Gap(in_channels,n_class)
         self.diffuse = Diffusion(in_channels,kq_dim,n_heads=n_heads)
-        self.relation = Relation(in_channels,kq_dim,n_heads=n_heads)
+        self.infuse = Infusion(in_channels,kq_dim,n_heads=n_heads)
         self.transform = nn.Conv2d(int(in_channels*2),in_channels,(3,3),padding=1)
         self.dif_pattern = dif_pattern
         self.rel_pattern = rel_pattern
@@ -166,7 +166,7 @@ class Bayes(nn.Module):
         feats_d,feats_r = [],[]
 
         for ksize,dilation in self.rel_pattern:
-            feats_r.append(self.relation(feats,Q,K,ksize,dilation))
+            feats_r.append(self.infuse(feats,Q,K,ksize,dilation))
         feats_r = torch.stack(feats_r,dim=0).sum(0)
         pred_r = self.gap_r(feats_r)
 

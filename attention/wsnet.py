@@ -9,7 +9,7 @@ if torch.cuda.is_available():
     import torch.cuda as device
 else:
     import torch as device
-from .relation import Relation, Diffusion, Gap, KQ, Bayes
+from .relation import Gap, KQ, Bayes
 
 class WeaklySupNet(nn.Module):
     """
