@@ -130,24 +130,6 @@ class Diffusion(nn.Module):
         V_new = col2im_indices(V_cols,V.shape,Hf,Wf,padding,1,dilation)
         return V_new
 
-    # def drawDiffuseMap(self,n):
-    #     N,D,H,W = self.Q.shape
-    #     attmap = self.att[0].squeeze().view(self.ksize*self.ksize,H,W,N)[...,n] #(9,124,124)
-    #     bound = (int(self.ksize/2))*self.dilation
-
-    #     yofs = torch.from_numpy(np.repeat(np.arange(-bound,bound+1,self.dilation), self.ksize)).type(device.FloatTensor)
-    #     xofs = torch.from_numpy(np.tile(np.arange(-bound,bound+1,self.dilation), self.ksize)).type(device.FloatTensor)
-    #     # calculate drift measure
-    #     y_drift = (torch.abs(attmap)*yofs[:,None,None]).sum(0)#/torch.abs(attmap).sum(2) # broadcast
-    #     x_drift = (torch.abs(attmap)*xofs[:,None,None]).sum(0)#/torch.abs(attmap).sum(2) # broadcast
-    #     # plot drift heat map
-    #     drift_map = torch.sqrt(x_drift**2+y_drift**2)
-
-    #     # plt.figure(2)
-    #     # plt.imshow(drift_map.data.cpu().numpy())
-    #     # plt.show()
-    #     return drift_map
-
 class Bayes(nn.Module):
     def __init__(self, in_channels, kq_dim, n_class, n_heads=1, dif_pattern=[(3,6)],rel_pattern=[(5,3)]):
         super(Bayes, self).__init__()

@@ -10,13 +10,12 @@ if torch.cuda.is_available():
     import torch.cuda as device
 else:
     import torch as device
-    
+
 
 class WeaklySupNet(nn.Module):
     """
     An end-to-end semantic segmentation net via cross-entropy loss only. 
     """
-   
     def __init__(self,nclass):
         super(WeaklySupNet,self).__init__()     
         kq_dim = 16
@@ -44,7 +43,7 @@ class WeaklySupNet(nn.Module):
 
     def getHeatmaps(self,classid):
         zzz = classid[:,None,None,None].repeat(1,self.gap.heatmaps.shape[1],self.gap.heatmaps.shape[2],1)
-        hm = torch.gather(self.gap.heatmaps,3,zzz).squeeze()#self.heatmaps[:,classid.type(device.LongTensor)]
+        hm = torch.gather(self.gap.heatmaps,3,zzz).squeeze()
         return hm
 
     def forward(self,x,label):
