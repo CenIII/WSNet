@@ -32,6 +32,8 @@ class Gap(nn.Module):
         soft_mask = F.relu(self.heatmaps)
         mask = torch.gather(soft_mask, 3, label[:, None, None, None].repeat(1, W, H, 1)).squeeze().detach() # (8, 81, 81)
         mask_norm = (mask/torch.clamp(torch.max(mask.view(N, -1), dim=1)[0], 1.)[:, None, None]).unsqueeze(1)
+        mask_norm[mask_norm>0.15]=1
+        mask_norm[mask_norm<=0.15]=0
         return mask_norm
 
 class LeakyLogGap(Gap):
@@ -51,16 +53,20 @@ class KQ(nn.Module):
         super(KQ, self).__init__()
         self.k = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, (1, 1)), 
-            nn.BatchNorm2d(in_channels), 
+            # nn.BatchNorm2d(in_channels), 
             nn.ReLU(), 
             nn.Conv2d(in_channels, kq_dim, (1, 1)), 
             )
         self.q = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, (1, 1)), 
-            nn.BatchNorm2d(in_channels), 
+            # nn.BatchNorm2d(in_channels), 
             nn.ReLU(), 
             nn.Conv2d(in_channels, kq_dim, (1, 1)), 
-            nn.BatchNorm2d(kq_dim), 
+            # # nn.BatchNorm2d(kq_dim), 
+            nn.ReLU(), 
+            nn.Conv2d(kq_dim, kq_dim, (1, 1)), 
+            nn.ReLU(), 
+            nn.Conv2d(kq_dim, kq_dim, (1, 1)), 
             nn.ReLU(), 
             nn.Conv2d(kq_dim, kq_dim, (1, 1)), 
             )
@@ -89,7 +95,7 @@ class Infusion(nn.Module):
         K_trans = im2col_indices(K, Hf, Wf, padding, 1, dilation) # (3200, 38440)
         Q_trans = Q.permute(1, 2, 3, 0).contiguous().view(self.n_heads, self.h_dim, -1) # (128, 38440)
         tmp = (K_trans.view(self.n_heads, self.h_dim, -1, K_trans.shape[-1]) * Q_trans.unsqueeze(2)).view(self.n_heads, self.h_dim, Hf*Wf, -1)
-        tmp = tmp.sum(1, True) # (4, 1, 5*5, 38440)
+        tmp = tmp.sum(1, True)/np.sqrt(self.h_dim) # (4, 1, 5*5, 38440)
         att = torch.softmax(tmp, 2) # (4, 1, 25, 38440)
         V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(self.n_heads, self.vh_dim, Hf*Wf, -1)
         out = (V_trans * att).sum(2).view(D, H, W, N).permute(3, 0, 1, 2)
@@ -120,7 +126,7 @@ class Diffusion(nn.Module):
         K_trans = im2col_indices(K, Hf, Wf, padding, 1, dilation) # (800, 123008)
         Q_trans = Q.permute(1, 2, 3, 0).contiguous().view(D, -1) # (32, 123008)
         tmp = (K_trans.view(D, -1, K_trans.shape[-1]) * Q_trans.unsqueeze(1)).view(self.n_heads, self.h_dim, Hf*Wf, -1)
-        tmp = tmp.sum(1, True) # (4, 1, 5*5, 123008)
+        tmp = tmp.sum(1, True)/np.sqrt(self.h_dim) # (4, 1, 5*5, 123008)
         self.att = torch.softmax(tmp, 2) # (4, 1, 25, 123008)
         mask = mask.squeeze().permute(1, 2, 0).contiguous().view(-1)
         self.att = self.att * mask[None, None, None, :] 
@@ -135,30 +141,29 @@ class Bayes(nn.Module):
         super(Bayes, self).__init__()
         self.dif_pattern = dif_pattern
         self.rel_pattern = rel_pattern
-        self.gap = Gap(in_channels, n_class)
-        self.gap_r = Gap(in_channels, n_class)
+        # self.gap = Gap(in_channels, n_class)
+        # self.gap_r = Gap(in_channels, n_class)
         self.infuse = Infusion(in_channels, kq_dim, n_heads=n_heads)
         self.diffuse = Diffusion(in_channels, kq_dim, n_heads=n_heads)
-        self.transform = nn.Conv2d(int(in_channels*2), in_channels, (3, 3), padding=1)
+        self.transform = nn.Conv2d(int(in_channels*2), in_channels, (3, 3), padding=1, bias=False)
+        self.n_class = n_class
         
-        
-    def forward(self, feats, K, Q, label):
-        pred = self.gap(feats, save_hm=True)
-        mask = self.gap.make_mask(label)
-        
+    def forward(self, feats, mask, K, Q):
+        N = feats.shape[0]
+        feats = feats.permute(0,3,1,2)
         feats_d, feats_r = [], []
 
         for ksize, dilation in self.rel_pattern:
             feats_r.append(self.infuse(feats, Q, K, ksize, dilation))
         feats_r = torch.stack(feats_r, dim=0).sum(0)
-        pred_r = self.gap_r(feats_r)
-
-        for ksize, dilation in self.dif_pattern:
-            feats_d.append(self.diffuse(feats, K, Q, ksize, dilation, mask))
-        feats_d = torch.stack(feats_d, dim=0).sum(0)
-        nxt_feats = self.transform(torch.cat((feats*mask, feats_d), dim=1))
-
-        return nxt_feats, [pred, pred_r]
+        pred_r = torch.mean(feats_r.view(N, self.n_class, -1), dim=2) #self.gap_r(feats_r)
+        self.hm_rel = feats_r.permute(0,2,3,1)
+        # for ksize, dilation in self.dif_pattern:
+        #     feats_d.append(self.diffuse(feats, K, Q, ksize, dilation, mask))
+        # feats_d = torch.stack(feats_d, dim=0).sum(0)
+        # nxt_feats = feats_d # self.transform(torch.cat((feats*mask, feats_d), dim=1))
+        # self.heatmaps = nxt_feats.permute(0,2,3,1)
+        return None, [pred_r]
 
         
 
