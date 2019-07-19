@@ -12,16 +12,14 @@ import torch.nn.functional as F
 class Gap(nn.Module):
     def __init__(self, in_channels, n_class):
         super(Gap, self).__init__()
-        self.lin = nn.Linear(in_channels, n_class, bias=False)
+        self.lin = nn.Conv2d(in_channels,n_class,1,bias=False) #nn.Linear(in_channels, n_class, bias=False)
         self.n_class = n_class
 
-    def forward(self, x, save_hm=False):
+    def forward(self, x):
         N = x.shape[0]
-        x = self.lin(x.permute(0, 2, 3, 1))
-        if save_hm:
-            self.heatmaps = x
-        x = torch.mean(x.view(N, -1, self.n_class), dim=1)
-        return x
+        cam = self.lin(x) #.permute(0, 2, 3, 1)
+        pred = torch.mean(cam.view(N, self.n_class, -1), dim=2)
+        return pred, F.relu(cam)
 
     def infer_class_maps(self, x):
         x = self.lin(x.permute(0, 2, 3, 1))
@@ -53,16 +51,8 @@ class KQ(nn.Module):
         super(KQ, self).__init__()
         self.k = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, (1, 1)), 
-            # nn.BatchNorm2d(in_channels), 
             nn.ReLU(), 
             nn.Conv2d(in_channels, kq_dim, (1, 1)), 
-            )
-        self.q = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, (1, 1)), 
-            # nn.BatchNorm2d(in_channels), 
-            nn.ReLU(), 
-            nn.Conv2d(in_channels, kq_dim, (1, 1)), 
-            # # nn.BatchNorm2d(kq_dim), 
             nn.ReLU(), 
             nn.Conv2d(kq_dim, kq_dim, (1, 1)), 
             nn.ReLU(), 
@@ -70,6 +60,10 @@ class KQ(nn.Module):
             nn.ReLU(), 
             nn.Conv2d(kq_dim, kq_dim, (1, 1)), 
             )
+        self.q = nn.Sequential(
+            nn.Conv2d(in_channels, kq_dim, (1, 1)), 
+            )
+        
     def forward(self, x):
         K = self.k(x)
         Q = self.q(x)
@@ -79,13 +73,11 @@ class KQ(nn.Module):
 class Infusion(nn.Module):
     def __init__(self, v_dim, kq_dim, n_heads=1, kernel_size=5, dilation=3):
         super(Infusion, self).__init__()  
-        assert(v_dim % n_heads == 0)
         assert(kq_dim % n_heads == 0)
         self.v_dim = v_dim
         self.kq_dim = kq_dim
         self.n_heads = n_heads
         self.h_dim = int(kq_dim / n_heads)
-        self.vh_dim = int(v_dim / self.n_heads)
 
     def forward(self, V, K, Q, ksize, dilation): # NxDxHxW
         N, D, H, W = V.shape # 8, 32, 124, 124
@@ -97,8 +89,8 @@ class Infusion(nn.Module):
         tmp = (K_trans.view(self.n_heads, self.h_dim, -1, K_trans.shape[-1]) * Q_trans.unsqueeze(2)).view(self.n_heads, self.h_dim, Hf*Wf, -1)
         tmp = tmp.sum(1, True)/np.sqrt(self.h_dim) # (4, 1, 5*5, 38440)
         att = torch.softmax(tmp, 2) # (4, 1, 25, 38440)
-        V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(self.n_heads, self.vh_dim, Hf*Wf, -1)
-        out = (V_trans * att).sum(2).view(D, H, W, N).permute(3, 0, 1, 2)
+        V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(1, self.v_dim, Hf*Wf, -1)
+        out = (V_trans * att).sum(2).sum(0).view(D, H, W, N).permute(3, 0, 1, 2)/self.n_heads
         return out
 
 class Diffusion(nn.Module):
@@ -136,34 +128,21 @@ class Diffusion(nn.Module):
         V_new = col2im_indices(V_cols, V.shape, Hf, Wf, padding, 1, dilation)
         return V_new
 
-class Bayes(nn.Module):
-    def __init__(self, in_channels, kq_dim, n_class, n_heads=1, dif_pattern=[(3, 6)], rel_pattern=[(5, 3)]):
-        super(Bayes, self).__init__()
-        self.dif_pattern = dif_pattern
+class Relation(nn.Module):
+    def __init__(self, in_channels, kq_dim, n_class, n_heads=1, rel_pattern=[(5, 3)]):
+        super(Relation, self).__init__()
         self.rel_pattern = rel_pattern
-        # self.gap = Gap(in_channels, n_class)
-        # self.gap_r = Gap(in_channels, n_class)
         self.infuse = Infusion(in_channels, kq_dim, n_heads=n_heads)
-        self.diffuse = Diffusion(in_channels, kq_dim, n_heads=n_heads)
-        self.transform = nn.Conv2d(int(in_channels*2), in_channels, (3, 3), padding=1, bias=False)
         self.n_class = n_class
         
-    def forward(self, feats, mask, K, Q):
+    def forward(self, feats, K, Q):
         N = feats.shape[0]
-        feats = feats.permute(0,3,1,2)
-        feats_d, feats_r = [], []
-
+        feats_r = []
         for ksize, dilation in self.rel_pattern:
-            feats_r.append(self.infuse(feats, Q, K, ksize, dilation))
+            feats_r.append(self.infuse(feats, K, Q, ksize, dilation))
         feats_r = torch.stack(feats_r, dim=0).sum(0)
-        pred_r = torch.mean(feats_r.view(N, self.n_class, -1), dim=2) #self.gap_r(feats_r)
-        self.hm_rel = feats_r.permute(0,2,3,1)
-        # for ksize, dilation in self.dif_pattern:
-        #     feats_d.append(self.diffuse(feats, K, Q, ksize, dilation, mask))
-        # feats_d = torch.stack(feats_d, dim=0).sum(0)
-        # nxt_feats = feats_d # self.transform(torch.cat((feats*mask, feats_d), dim=1))
-        # self.heatmaps = nxt_feats.permute(0,2,3,1)
-        return None, [pred_r]
+        pred_r = torch.mean(feats_r.view(N, self.n_class, -1), dim=2)
+        return pred_r, feats_r
 
         
 
