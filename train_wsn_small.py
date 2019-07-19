@@ -103,10 +103,10 @@ def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 	
 	iterno = 0
 	cb = [[None, None], [None, None], [None, None]]
-	filt_data = [gauss_filt(data) for i in range(5)]
+	filt_data = [gauss_filt(data) for i in range(10)]
 	while True:
 		if iterno%1==0:
-			indlist = np.random.choice(5, 5, replace=False)
+			indlist = np.random.choice(10, 10, replace=False)
 		idx = np.arange(8)
 		preds, pred0 = net(filt_data[indlist[iterno%5]][idx], label_vis[idx]) #, pred_tmask
 		loss = []
