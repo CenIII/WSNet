@@ -40,7 +40,7 @@ class WeaklySupNet(nn.Module):
             nn.Conv2d(64, 64, (3, 3), padding=1)
         )
         self.gap0 = Gap(64, nclass)
-        self.relation = Relation(2, kq_dim, 2, n_heads=1, rel_pattern=[(7, 3),(3,3),(5,1),(5,3),(5,5)])
+        self.relation = Relation(2, kq_dim, 2, n_heads=1, rel_pattern=[(3,3),(5,1),(5,3),(5,5)])
         self.nclass = nclass
 
     def getHeatmaps(self, classid):
@@ -61,9 +61,10 @@ class WeaklySupNet(nn.Module):
         K, Q = self.kq(feats_rel)
         pred0, cam0 = self.gap0(feats_lc)
         pred1, cam1 = self.relation(cam0, K, Q)
-        
+        pred2, cam2 = self.relation(cam1, K, Q)
+
         self.initheatmaps = cam0.permute(0,2,3,1)
-        self.heatmaps = cam1.permute(0,2,3,1)
+        self.heatmaps = cam2.permute(0,2,3,1)
     
         return [pred1, pred0]
     
