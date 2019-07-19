@@ -21,30 +21,30 @@ import matplotlib
 matplotlib.use('tkagg')
 
 def visualize(net, label, fig, ax, cb, iterno):
-	# hm = net.getHeatmaps(label).data.cpu().numpy()
+	hm = net.getHeatmaps(label).data.cpu().numpy()
 
 	# plot here
-	# for i in range(len(ax[0])):
-	# 	img = ax[0][i].imshow(hm[1+i*4])
-	# 	if cb[0][i] is not None:
-	# 		cb[0][i].remove()
-	# 	cb[0][i] = plt.colorbar(img, ax=ax[0][i])
+	for i in range(len(ax[0])):
+		img = ax[0][i].imshow(hm[1+i*4])
+		if cb[0][i] is not None:
+			cb[0][i].remove()
+		cb[0][i] = plt.colorbar(img, ax=ax[0][i])
 
-	# plot here
-	hm = net.getMask().squeeze().data.cpu().numpy()
-	for i in range(len(ax[1])):
-		# hm = net.diffuse.drawDiffuseMap(1+i*4).data.cpu().numpy()
-		img = ax[1][i].imshow(hm[1+i*4])
-		if cb[1][i] is not None:
-			cb[1][i].remove()
-		cb[1][i] = plt.colorbar(img, ax=ax[1][i])
+	# # plot here
+	# hm = net.getMask().squeeze().data.cpu().numpy()
+	# for i in range(len(ax[1])):
+	# 	# hm = net.diffuse.drawDiffuseMap(1+i*4).data.cpu().numpy()
+	# 	img = ax[1][i].imshow(hm[1+i*4])
+	# 	if cb[1][i] is not None:
+	# 		cb[1][i].remove()
+	# 	cb[1][i] = plt.colorbar(img, ax=ax[1][i])
 	
-	hm = net.getHmRel(label).data.cpu().numpy()
-	for i in range(len(ax[2])):
-		img = ax[2][i].imshow(hm[1+i*4])
-		if cb[2][i] is not None:
-			cb[2][i].remove()
-		cb[2][i] = plt.colorbar(img, ax=ax[2][i])
+	# hm = net.getHmRel(label).data.cpu().numpy()
+	# for i in range(len(ax[2])):
+	# 	img = ax[2][i].imshow(hm[1+i*4])
+	# 	if cb[2][i] is not None:
+	# 		cb[2][i].remove()
+	# 	cb[2][i] = plt.colorbar(img, ax=ax[2][i])
 	
 	# get 8th image's both heatmaps
 	# hm = net.heatmaps[8].data.cpu().numpy()
@@ -107,13 +107,14 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 		if iterno%1==0:
 			indlist = np.random.choice(5, 5, replace=False)
 		idx = np.arange(8)
-		preds, pred0 = net(filt_data[indlist[iterno%5]][idx], label_vis[idx]) #, pred_tmask
-		loss = []
-		for pred in preds:
-			tmp = crit0(pred, label[idx])
-			loss.append(tmp)
-		loss.append(crit0(pred0, label[idx]))
-		loss = sum(loss)
+		pred0 = net(filt_data[indlist[iterno%5]][idx], label_vis[idx]) #, pred_tmask
+		# loss = []
+		# for pred in preds:
+		# 	tmp = crit0(pred, label[idx])
+		# 	loss.append(tmp)
+		# loss.append(crit0(pred0, label[idx]))
+		loss = crit0(pred0, label[idx])
+		# loss = sum(loss)
 		optimizer.zero_grad()
 		loss.backward()
 		print('iterno='+str(iterno)+', loss='+str(loss))
