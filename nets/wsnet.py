@@ -66,5 +66,4 @@ class WeaklySupNet(nn.Module):
         self.initheatmaps = cam0.permute(0,2,3,1)
         self.heatmaps = cam2.permute(0,2,3,1)
     
-        return [pred1, pred0]
-    
+        return [pred1, pred2], pred0 

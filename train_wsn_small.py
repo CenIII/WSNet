@@ -19,6 +19,7 @@ import cv2
 import numpy as np
 import matplotlib
 matplotlib.use('tkagg')
+from utils.tools import multilabel_soft_pull_loss
 
 def visualize(net, label, fig, ax, cb, iterno):
 	hm = net.getHeatmaps(label).data.cpu().numpy()
@@ -90,7 +91,7 @@ def gauss_filt(data): #[8, 3, 512, 512]
 	return ret
 
 
-def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
+def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 	if torch.cuda.is_available():
 		data = data.cuda()
 		net = net.cuda()
@@ -107,12 +108,13 @@ def train(net, data, label, label_vis, optimizer, crit0, epoches=100):
 		if iterno%1==0:
 			indlist = np.random.choice(5, 5, replace=False)
 		idx = np.arange(8)
-		preds = net(filt_data[indlist[iterno%5]][idx], label_vis[idx]) #, pred_tmask
+		preds, pred0 = net(filt_data[indlist[iterno%5]][idx], label_vis[idx]) #, pred_tmask
 		loss = []
 		for pred in preds:
 			tmp = crit0(pred, label[idx])
 			loss.append(tmp)
-		loss = sum(loss)
+		loss = sum(loss)/len(loss)
+		loss += crit0(pred0, label[idx])
 		optimizer.zero_grad()
 		loss.backward()
 		print('iterno='+str(iterno)+', loss='+str(loss))
@@ -128,5 +130,6 @@ if __name__ == '__main__':
 	net = WeaklySupNet(nclass=2)
 	optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 	crit0 = torch.nn.MultiLabelSoftMarginLoss()
+	crit1 = multilabel_soft_pull_loss
 	data, label, label_vis = loadData()
-	train(net, data, label, label_vis, optimizer, crit0)
+	train(net, data, label, label_vis, optimizer, crit0, crit1)
