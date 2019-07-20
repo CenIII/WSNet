@@ -4,7 +4,7 @@ high level support for doing this and that.
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from .modules import Gap, KQ, Relation
+from .modules import Gap, KQ, Relation,Boundary
 
 if torch.cuda.is_available():
     import torch.cuda as device
@@ -33,6 +33,7 @@ class WeaklySupNet(nn.Module):
             nn.ReLU()
             )
         self.kq = KQ(64, kq_dim)
+        self.boundary = Boundary(64)
         self.branch_local = nn.Sequential(
             nn.Conv2d(64, 64, (3, 3), padding=1)
         )
@@ -57,12 +58,14 @@ class WeaklySupNet(nn.Module):
         bb = self.backbone(x)
         feats_lc = self.branch_local(bb)
         feats_rel = self.branch_relation(bb)
-        
-        K, Q = self.kq(feats_rel)
+        # import pdb;pdb.set_trace()
+        # K, Q = self.kq(feats_rel)
+        boundary = self.boundary(feats_rel)
         pred0, cam0 = self.gap0(feats_lc)
-        pred1, cam1 = self.relation(cam0, K, Q)
-        pred2, cam2 = self.relation(cam1, K, Q)
+        pred1, cam1 = self.relation(cam0, boundary)
+        pred2, cam2 = self.relation(cam1, boundary)
 
+        self.bmap = boundary.squeeze()
         self.initheatmaps = cam0.permute(0,2,3,1)
         self.heatmaps = cam2.permute(0,2,3,1)
     

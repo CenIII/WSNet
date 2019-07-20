@@ -1,1 +1,1 @@
-from .relation import Gap, LeakyLogGap, Infusion, Diffusion, Relation, KQ
+from .relation import Gap, LeakyLogGap, Infusion, Diffusion, Relation, KQ, Boundary

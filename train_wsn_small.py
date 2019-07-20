@@ -1,6 +1,8 @@
 """
 high level support for doing this and that.
 """
+import matplotlib
+matplotlib.use('tkagg')
 import torch
 import tqdm
 import numpy as np
@@ -17,8 +19,7 @@ import os
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
-import matplotlib
-matplotlib.use('tkagg')
+
 from utils.tools import multilabel_soft_pull_loss
 
 def visualize(net, label, fig, ax, cb, iterno):
@@ -32,13 +33,12 @@ def visualize(net, label, fig, ax, cb, iterno):
 		cb[0][i] = plt.colorbar(img, ax=ax[0][i])
 
 	# plot here
-	# hm = net.getMask().squeeze().data.cpu().numpy()
-	# for i in range(len(ax[1])):
-	# 	# hm = net.diffuse.drawDiffuseMap(1+i*4).data.cpu().numpy()
-	# 	img = ax[1][i].imshow(hm[1+i*4])
-	# 	if cb[1][i] is not None:
-	# 		cb[1][i].remove()
-	# 	cb[1][i] = plt.colorbar(img, ax=ax[1][i])
+	hm = net.bmap.data.cpu().numpy()
+	for i in range(len(ax[1])):
+		img = ax[1][i].imshow(hm[1+i*4])
+		if cb[1][i] is not None:
+			cb[1][i].remove()
+		cb[1][i] = plt.colorbar(img, ax=ax[1][i])
 	
 	hm = net.getInitHeatmaps(label).data.cpu().numpy()
 	for i in range(len(ax[2])):

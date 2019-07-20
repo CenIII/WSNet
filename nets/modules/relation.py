@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from utils.tools import im2col_indices, col2im_indices
+from utils.tools import im2col_indices, col2im_indices,im2col_boundary
 if torch.cuda.is_available():
 	import torch.cuda as device
 else:
@@ -46,6 +46,22 @@ class LeakyLogGap(Gap):
         x = torch.mean((x - 0.12 * F.relu(-pre_hm)).view(N, -1, self.n_class), dim=1)
         return x
 
+class Boundary(nn.Module):
+    def __init__(self,in_channels):
+        super(Boundary,self).__init__()
+        self.nn = nn.Sequential(
+            nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels,1,(3,3),padding=1),
+            nn.Sigmoid()
+        )
+    def forward(self,x):
+        return self.nn(x)
+
 class KQ(nn.Module):
     def __init__(self, in_channels, kq_dim):
         super(KQ, self).__init__()
@@ -79,18 +95,36 @@ class Infusion(nn.Module):
         self.n_heads = n_heads
         self.h_dim = int(kq_dim / n_heads)
 
-    def forward(self, V, K, Q, ksize, dilation): # NxDxHxW
-        N, D, H, W = V.shape # 8, 32, 124, 124
+    def forward(self,V,boundary,ksize,dilation,dist_to_center):
+        # get a [1,1,fW*fH,W*H*B] attention 
+        N, D, H, W = V.shape
         padding = int(ksize/2)*dilation
         Hf = ksize
         Wf = ksize
-        K_trans = im2col_indices(K, Hf, Wf, padding, 1, dilation) # (3200, 38440)
-        Q_trans = Q.permute(1, 2, 3, 0).contiguous().view(self.n_heads, self.h_dim, -1) # (128, 38440)
-        tmp = (K_trans.view(self.n_heads, self.h_dim, -1, K_trans.shape[-1]) * Q_trans.unsqueeze(2)).view(self.n_heads, self.h_dim, Hf*Wf, -1)
-        tmp = tmp.sum(1, True)/np.sqrt(self.h_dim) # (4, 1, 5*5, 38440)
-        att = torch.softmax(tmp, 2) # (4, 1, 25, 38440)
-        V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(1, self.v_dim, Hf*Wf, -1)
-        out = (V_trans * att).sum(2).sum(0).view(D, H, W, N).permute(3, 0, 1, 2)/self.n_heads
+        
+        boundary_max = im2col_boundary(boundary, Hf, Wf, padding, 1, dilation,dist_to_center)
+        boundary_sim = torch.ones_like(boundary_max)-boundary_max
+        boundary_sim = boundary_sim.unsqueeze(0).unsqueeze(0) # torch.Size([1, 1, 25, 52488])
+        print(boundary_sim.shape)
+        
+        att =  torch.softmax(boundary_sim, 2) # [1,1,fW*fH,W*H*B]
+        V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(1, self.v_dim, Hf*Wf, -1) # torch.Size([1, 2, 9, 52488])
+        out = (V_trans * att).sum(2).sum(0).view(D, H, W, N).permute(3, 0, 1, 2)/self.n_heads # torch.Size([8, 2, 81, 81])
+        return out
+
+    def forward_old(self, V, K, Q, ksize, dilation): # NxDxHxW
+        import pdb;pdb.set_trace()
+        N, D, H, W = V.shape # torch.Size([8, 2, 81, 81])
+        padding = int(ksize/2)*dilation #3
+        Hf = ksize # kernal size 
+        Wf = ksize
+        K_trans = im2col_indices(K, Hf, Wf, padding, 1, dilation) # torch.Size([144, 52488]) [fW*fH*D,W*H*B]
+        Q_trans = Q.permute(1, 2, 3, 0).contiguous().view(self.n_heads, self.h_dim, -1) # torch.Size([1, 16, 52488]) [1,D,W*H*B]
+        tmp = (K_trans.view(self.n_heads, self.h_dim, -1, K_trans.shape[-1]) * Q_trans.unsqueeze(2)).view(self.n_heads, self.h_dim, Hf*Wf, -1) #torch.Size([1, 16, 9, 52488])
+        tmp = tmp.sum(1, True)/np.sqrt(self.h_dim) # torch.Size([1, 1, 9, 52488])
+        att = torch.softmax(tmp, 2) # torch.Size([1, 1, 9, 52488]) [1,1,fW*fH,W*H*B]
+        V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(1, self.v_dim, Hf*Wf, -1) # torch.Size([1, 2, 9, 52488])
+        out = (V_trans * att).sum(2).sum(0).view(D, H, W, N).permute(3, 0, 1, 2)/self.n_heads # torch.Size([8, 2, 81, 81])
         return out
 
 class Diffusion(nn.Module):
@@ -129,21 +163,36 @@ class Diffusion(nn.Module):
         return V_new
 
 class Relation(nn.Module):
+    def calculate_dist_pattern(self,rel_pattern):
+        use_cuda = torch.cuda.is_available()
+        pattern_dict = {}
+        for ksize, _ in rel_pattern:
+            pattern = torch.zeros([ksize,ksize])
+            mid = int(ksize/2)
+            for i in range(ksize):
+                for j in range(ksize):
+                    pattern[i][j]= max(abs(i-mid),abs(j-mid))
+            pattern = pattern.long()
+            if use_cuda:
+                pattern=pattern.cuda()
+            pattern_dict[ksize]=pattern
+        return pattern_dict
+        
     def __init__(self, in_channels, kq_dim, n_class, n_heads=1, rel_pattern=[(5, 3)]):
         super(Relation, self).__init__()
         self.rel_pattern = rel_pattern
         self.infuse = Infusion(in_channels, kq_dim, n_heads=n_heads)
         self.n_class = n_class
-        
-    def forward(self, feats, K, Q):
+        self.dist_pattern_dict = self.calculate_dist_pattern(rel_pattern)
+
+    def forward(self, feats, boundary):
         N = feats.shape[0]
         feats_r = []
+        # import pdb;pdb.set_trace()
         for ksize, dilation in self.rel_pattern:
-            feats_r.append(self.infuse(feats, K, Q, ksize, dilation))
+            dist_to_center = self.dist_pattern_dict[ksize]
+            feats_r.append(self.infuse(feats,boundary, ksize, dilation,self.dist_pattern_dict[ksize]))
+            
         feats_r = torch.stack(feats_r, dim=0).sum(0)
         pred_r = torch.mean(feats_r.view(N, self.n_class, -1), dim=2)
         return pred_r, feats_r
-
-        
-
-        
