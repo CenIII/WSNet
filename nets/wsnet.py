@@ -37,7 +37,7 @@ class WeaklySupNet(nn.Module):
             nn.Conv2d(64, 64, (3, 3), padding=1)
         )
         self.branch_relation = nn.Sequential(
-            nn.Conv2d(64, 64, (3, 3), padding=1)
+            nn.Conv2d(64, 64, (1, 1))#, padding=1)
         )
         self.gap0 = Gap(64, nclass)
         self.relation = Relation(2, kq_dim, 2, n_heads=1, rel_pattern=[(3,3),(5,1),(5,3),(5,5)])
