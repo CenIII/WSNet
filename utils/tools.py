@@ -58,7 +58,19 @@ def im2col_boundary(x, field_height, field_width, padding=1, stride=1, dilate=1,
     cols_list = [] 
     cols_max_list = []
     
-    for dilate_i in range(1,dilate+1):
+    # import pdb;pdb.set_trace()
+    # deal with center, reuse code for dilate=1
+    padding = int(field_height/2)*1
+    p = padding
+    x_padded = F.pad(x, (p, p, p, p), mode='constant',value=0)
+    k, i, j = get_im2col_indices(x.shape, field_height, field_width, padding,
+                                stride, 1)
+    cols_i = x_padded[:, k, i, j] #torch.Size([B, fW*fH*D, W*H])
+    # cols_i = cols_i[:,int(field_height*field_width/2),:].unsqueeze(1) # copy the value of center point
+    cols_i = cols_i.expand(-1,field_height*field_width,-1)
+    cols_list.append(cols_i)
+
+    for dilate_i in range(1,dilate+1): # 1
         padding = int(field_height/2)*dilate_i # assume the height& width is always the same
         p = padding
         x_padded = F.pad(x, (p, p, p, p), mode='constant',value=0)
@@ -68,19 +80,16 @@ def im2col_boundary(x, field_height, field_width, padding=1, stride=1, dilate=1,
         cols_i = x_padded[:, k, i, j] #torch.Size([B, fW*fH*D, W*H])
         cols_list.append(cols_i)
     cols_all = torch.stack(cols_list) # torch.Size([Dilate, B, fW*fH*D, W*H])
-    for dilate_i in range(1,dilate+1):
-        cols,_ = torch.max(cols_all[:dilate_i,:,:,:],dim=0) # torch.Size([B, fW*fH*D, W*H])
+    for dist_i in range(0,dilate+1): # calculate max on path, dilate_i=k choose from k+1 values
+        cols,_ = torch.max(cols_all[:dist_i+1,:,:,:],dim=0) # torch.Size([B, fW*fH*D, W*H])
         cols_max_list.append(cols)
     cols_max_all = torch.stack(cols_max_list) # torch.Size([Dilate, B, fW*fH*D, W*H])
     dist_to_center = dist_to_center.reshape(1,1,-1,1).expand(1,cols_max_all.shape[1],-1,cols_max_all.shape[3]).contiguous() # torch.Size([1, B, fW*fH*D, W*H])
-    import pdb;pdb.set_trace()
-    cols = torch.gather(cols_max_all,dim=0,index=dist_to_center).squeeze(0)
-    print(cols.shape)
+    cols = torch.gather(cols_max_all,dim=0,index=dist_to_center).squeeze(0) # !!the problem occurs here
     C = x.shape[1] #D
     # [5,mid] is the original pixel for (2,2)
     
     cols = cols.permute(1, 2, 0).contiguous().view(field_height * field_width * C, -1) # [fW*fH*D,W*H*B] (feature for each pixel ,num of pixels)
-    print(cols.shape)
     return cols
 
 def im2col_indices(x, field_height, field_width, padding=1, stride=1, dilate=1):
@@ -90,7 +99,8 @@ def im2col_indices(x, field_height, field_width, padding=1, stride=1, dilate=1):
     # cols_list = []
     # for dilate_i in range(dilate):
         # padding = int(field_height/2)*dilate_i # assume the height& width is always the same
-    p = padding
+    # ==== Testing (5,1) case
+    p = padding #2
     x_padded = F.pad(x, (p, p, p, p), mode='constant',value=0)
 
     k, i, j = get_im2col_indices(x.shape, field_height, field_width, padding,

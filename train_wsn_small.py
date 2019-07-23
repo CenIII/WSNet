@@ -117,6 +117,7 @@ def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 		loss += crit0(pred0, label[idx])
 		optimizer.zero_grad()
 		loss.backward()
+		torch.nn.utils.clip_grad_norm_(net.boundary.parameters(),1)
 		print('iterno='+str(iterno)+', loss='+str(loss))
 		optimizer.step()
 		if iterno%5==0:

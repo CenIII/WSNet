@@ -51,12 +51,17 @@ class Boundary(nn.Module):
         super(Boundary,self).__init__()
         self.nn = nn.Sequential(
             nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
+            nn.BatchNorm2d(in_channels),
             nn.ReLU(),
-            nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels,1,(3,3),padding=1),
+            # nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
+            # nn.GroupNorm(8, in_channels),
+            # nn.ReLU(),
+            # nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
+            # nn.GroupNorm(8, in_channels),
+            # nn.ReLU(),
+            # nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
+            # nn.BatchNorm2d(in_channels),
+            nn.Conv2d(in_channels,1,(1,1)),
             nn.Sigmoid()
         )
     def forward(self,x):
@@ -97,23 +102,24 @@ class Infusion(nn.Module):
 
     def forward(self,V,boundary,ksize,dilation,dist_to_center):
         # get a [1,1,fW*fH,W*H*B] attention 
+        
         N, D, H, W = V.shape
         padding = int(ksize/2)*dilation
         Hf = ksize
         Wf = ksize
-        
+        # import pdb;pdb.set_trace()
         boundary_max = im2col_boundary(boundary, Hf, Wf, padding, 1, dilation,dist_to_center)
         boundary_sim = torch.ones_like(boundary_max)-boundary_max
         boundary_sim = boundary_sim.unsqueeze(0).unsqueeze(0) # torch.Size([1, 1, 25, 52488])
-        print(boundary_sim.shape)
         
         att =  torch.softmax(boundary_sim, 2) # [1,1,fW*fH,W*H*B]
+        
         V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(1, self.v_dim, Hf*Wf, -1) # torch.Size([1, 2, 9, 52488])
         out = (V_trans * att).sum(2).sum(0).view(D, H, W, N).permute(3, 0, 1, 2)/self.n_heads # torch.Size([8, 2, 81, 81])
         return out
 
     def forward_old(self, V, K, Q, ksize, dilation): # NxDxHxW
-        import pdb;pdb.set_trace()
+        # import pdb;pdb.set_trace()
         N, D, H, W = V.shape # torch.Size([8, 2, 81, 81])
         padding = int(ksize/2)*dilation #3
         Hf = ksize # kernal size 
