@@ -62,7 +62,7 @@ class WeaklySupNet(nn.Module):
         feats_rel = self.branch_relation(bb)
         # import pdb;pdb.set_trace()
         # K, Q = self.kq(feats_rel)
-        boundary = self.boundary(feats_rel)
+        boundary = self.boundary(bb)
         pred0, cam0 = self.gap0(feats_lc)
         pred1, cam1 = self.relation(cam0, boundary)
         pred2, cam2 = self.relation(cam1, boundary)

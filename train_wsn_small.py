@@ -129,7 +129,7 @@ def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 if __name__ == '__main__':
 
 	net = WeaklySupNet(nclass=2)
-	optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+	optimizer = torch.optim.Adam(net.parameters(), lr=0.0005)
 	crit0 = torch.nn.MultiLabelSoftMarginLoss()
 	crit1 = multilabel_soft_pull_loss
 	data, label, label_vis = loadData()
