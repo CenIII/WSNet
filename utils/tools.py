@@ -53,11 +53,18 @@ def get_im2col_indices(x_shape, field_height, field_width, padding=1, stride=1, 
     return (k, i, j)
 
 def im2col_boundary(x, field_height, field_width, padding=1, stride=1, dilate=1,dist_to_center=None):
+    # TODO: 1. check dist_to_center.
+    # 2. Modify the cols_list generation
+    # 3. Modify search range
+
     # For boundary map, D=1.
     # dist_to_center [ksize,ksize]
     cols_list = [] 
     cols_max_list = []
     
+    # ============= collect the path from center to dilate*int(ksize/2)
+    # (e.g: ksize=5,dilate=2. Then collect point with distance [0,4])
+
     # import pdb;pdb.set_trace()
     # deal with center, reuse code for dilate=1
     padding = int(field_height/2)*1
@@ -70,7 +77,7 @@ def im2col_boundary(x, field_height, field_width, padding=1, stride=1, dilate=1,
     cols_i = cols_i.expand(-1,field_height*field_width,-1)
     cols_list.append(cols_i)
 
-    for dilate_i in range(1,dilate+1): # 1
+    for dilate_i in range(1,int(field_height/2)*dilate+1): # 1~int(field_height/2)*dilate
         padding = int(field_height/2)*dilate_i # assume the height& width is always the same
         p = padding
         x_padded = F.pad(x, (p, p, p, p), mode='constant',value=0)
@@ -80,8 +87,10 @@ def im2col_boundary(x, field_height, field_width, padding=1, stride=1, dilate=1,
         cols_i = x_padded[:, k, i, j] #torch.Size([B, fW*fH*D, W*H])
         cols_list.append(cols_i)
     cols_all = torch.stack(cols_list) # torch.Size([Dilate, B, fW*fH*D, W*H])
-    for dist_i in range(0,dilate+1): # calculate max on path, dilate_i=k choose from k+1 values
-        cols,_ = torch.max(cols_all[:dist_i+1,:,:,:],dim=0) # torch.Size([B, fW*fH*D, W*H])
+
+    # For each distance, find the max value on path with dilationd distance [0,dist_i*dilate]
+    for dist_i in range(0,int(field_height/2)+1): # calculate max on path, dilate_i=k choose from k+1 values
+        cols,_ = torch.max(cols_all[:dist_i*dilate+1,:,:,:],dim=0) # torch.Size([B, fW*fH*D, W*H])
         cols_max_list.append(cols)
     cols_max_all = torch.stack(cols_max_list) # torch.Size([Dilate, B, fW*fH*D, W*H])
     dist_to_center = dist_to_center.reshape(1,1,-1,1).expand(1,cols_max_all.shape[1],-1,cols_max_all.shape[3]).contiguous() # torch.Size([1, B, fW*fH*D, W*H])

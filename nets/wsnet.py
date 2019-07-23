@@ -42,7 +42,7 @@ class WeaklySupNet(nn.Module):
         )
         self.gap0 = Gap(64, nclass)
         # self.relation = Relation(2, kq_dim, 2, n_heads=1, rel_pattern=[(3,3),(3,1),(5,3),(5,5)])
-        self.relation = Relation(2, kq_dim, 2, n_heads=1, rel_pattern=[(3,3),(3,1)(3,5)])
+        self.relation = Relation(2, kq_dim, 2, n_heads=1, rel_pattern=[(3,3),(3,1),(3,5),(5,1)])
         # self.relation = Relation(2, kq_dim, 2, n_heads=1, rel_pattern=[(3,3)])
         self.nclass = nclass
 
