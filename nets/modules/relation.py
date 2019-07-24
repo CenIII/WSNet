@@ -19,7 +19,7 @@ class Gap(nn.Module):
         N = x.shape[0]
         cam = self.lin(x) #.permute(0, 2, 3, 1)
         pred = torch.mean(cam.view(N, self.n_class, -1), dim=2)
-        return pred, cam #F.relu(cam)
+        return pred, cam #F.leaky_relu(cam)
 
     def infer_class_maps(self, x):
         x = self.lin(x.permute(0, 2, 3, 1))
@@ -109,11 +109,11 @@ class Infusion(nn.Module):
         Wf = ksize
         # import pdb;pdb.set_trace()
         boundary_max = im2col_boundary(boundary, Hf, Wf, padding, 1, dilation,dist_to_center)
-        boundary_sim = torch.ones_like(boundary_max)-boundary_max
+        boundary_sim = torch.ones_like(boundary_max)-boundary_max+1e-5
         boundary_sim = boundary_sim.unsqueeze(0).unsqueeze(0) # torch.Size([1, 1, 25, 52488])
         
-        att =  boundary_sim/torch.clamp(torch.sum(boundary_sim,dim=2,keepdim=True),0.1) #torch.softmax(boundary_sim, 2) # [1,1,fW*fH,W*H*B]
-        
+        att =  boundary_sim/torch.sum(boundary_sim,dim=2,keepdim=True) #torch.softmax(boundary_sim, 2) # [1,1,fW*fH,W*H*B]
+        att = att*((1-boundary).permute(1,2,3,0).contiguous().view(-1)[None,None,None,:])
         V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(1, self.v_dim, Hf*Wf, -1) # torch.Size([1, 2, 9, 52488])
         out = (V_trans * att).sum(2).sum(0).view(D, H, W, N).permute(3, 0, 1, 2)/self.n_heads # torch.Size([8, 2, 81, 81])
         return out
