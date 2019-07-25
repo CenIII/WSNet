@@ -12,14 +12,16 @@ import torch.nn.functional as F
 class Gap(nn.Module):
     def __init__(self, in_channels, n_class):
         super(Gap, self).__init__()
-        self.lin = nn.Conv2d(in_channels,n_class,1,bias=False) #nn.Linear(in_channels, n_class, bias=False)
+        self.lin = nn.Conv2d(in_channels,n_class-1,1,bias=False) #nn.Linear(in_channels, n_class, bias=False)
         self.n_class = n_class
 
     def forward(self, x):
         N = x.shape[0]
         cam = self.lin(x) #.permute(0, 2, 3, 1)
+        cam_2 = F.relu(1.-torch.sum(F.relu(cam),dim=1,keepdim=True)/2)+1e-5
+        cam = torch.cat((cam,cam_2),dim=1)
         pred = torch.mean(cam.view(N, self.n_class, -1), dim=2)
-        return pred, cam #F.leaky_relu(cam)
+        return pred, F.relu(cam) #F.relu(cam)+1. #F.leaky_relu(cam)
 
     def infer_class_maps(self, x):
         x = self.lin(x.permute(0, 2, 3, 1))

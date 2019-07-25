@@ -43,7 +43,7 @@ class WeaklySupNet(nn.Module):
         )
         
         self.gap0 = Gap(64, nclass)
-        self.relation = Relation(2, kq_dim, 2, n_heads=1, rel_pattern=[(3,3),(3,1),(3,5),(5,1)])
+        self.relation = Relation(nclass, kq_dim, nclass, n_heads=1, rel_pattern=[(3,3),(3,1),(3,5),(5,1)])
         self.nclass = nclass
 
     def getHeatmaps(self, classid):
@@ -65,7 +65,7 @@ class WeaklySupNet(nn.Module):
         
         boundary = self.boundary(feats_rel)
         pred0, cam0 = self.gap0(feats_lc)
-        pred1, cam1 = self.relation(cam0, boundary)
+        pred1, cam1 = self.relation(cam0.detach(), boundary)
         pred2, cam2 = self.relation(cam1, boundary)
         pred3, cam3 = self.relation(cam2, boundary)
 
