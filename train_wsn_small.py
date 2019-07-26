@@ -109,13 +109,13 @@ def train(net, data, label, label_vis, optimizer, crit0, crit1, epoches=100):
 		if iterno%1==0:
 			indlist = np.random.choice(5, 5, replace=False)
 		idx = np.arange(8)
-		preds, pred0 = net(filt_data[indlist[iterno%5]][idx], label_vis[idx]) #, pred_tmask
+		preds, pred0 = net(filt_data[indlist[iterno%5]][idx], label[idx]) #, pred_tmask
 		loss = []
 		for pred in preds:
 			tmp = crit0(pred, label[idx])
 			loss.append(tmp)
 		loss = sum(loss)/len(loss)
-		loss += crit0(pred0, label[idx])
+		loss += crit0(pred0[:,:2], label[idx][:,:2])
 		optimizer.zero_grad()
 		loss.backward()
 		torch.nn.utils.clip_grad_norm_(net.boundary.parameters(),1)
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
 	net = WeaklySupNet(nclass=3)
 	optimizer = torch.optim.Adam(net.parameters(), lr=0.0005)
-	crit0 = torch.nn.MultiLabelSoftMarginLoss(weight=torch.tensor([1,1,1]).type(device.FloatTensor))
+	crit0 = torch.nn.MultiLabelSoftMarginLoss()#weight=torch.tensor([1,1,1]).type(device.FloatTensor))
 	crit1 = multilabel_soft_pull_loss
 	data, label, label_vis = loadData()
 	train(net, data, label, label_vis, optimizer, crit0, crit1)

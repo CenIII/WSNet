@@ -33,7 +33,12 @@ class WeaklySupNet(nn.Module):
             nn.Conv2d(64, 64, (3, 3), padding=1), 
             nn.BatchNorm2d(64), 
             nn.ReLU()
-            )
+        ),
+            nn.Sequential(
+            nn.Conv2d(64, 64, (3, 3), padding=1), 
+            nn.BatchNorm2d(64), 
+            nn.ReLU()
+        )
         ])
         self.parymid = nn.MaxPool2d(2)
         
@@ -61,12 +66,21 @@ class WeaklySupNet(nn.Module):
         x1 = self.backbone[0](x)
         x2 = self.backbone[1](x1)
         bb = self.backbone[2](x2)
+        bb2 = self.backbone[3](x2)
         feats_rel = torch.cat((self.parymid(x1),x2,bb),dim=1)
-        feats_lc = self.branch_local(bb)
+        feats_lc = self.branch_local(bb2)
         
         boundary = self.boundary(feats_rel)
         pred0, cam0 = self.gap0(feats_lc)
-        pred1, cam1 = self.relation(cam0, boundary)
+
+        #
+        # import pdb;pdb.set_trace()
+        # label[label==0]=-1
+        # cam0_proc = cam0*label[...,None,None]
+        # cam0_proc = F.relu(cam0_proc)
+        # cam0_proc = cam0_proc*label[...,None,None]
+        #
+        pred1, cam1 = self.relation(F.relu(cam0), boundary)
         pred2, cam2 = self.relation(cam1, boundary)
         # pred3, cam3 = self.relation(cam2, boundary)
 

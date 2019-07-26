@@ -28,7 +28,7 @@ class Gap(nn.Module):
 
         pred = torch.mean(cam.view(N, self.n_class, -1), dim=2)
         # pred = pred/torch.tensor([1,1,10]).type(device.FloatTensor)[None,:]
-        return pred, F.relu(cam) #F.relu(cam)+1. #F.leaky_relu(cam)
+        return pred, cam#F.relu(cam) #F.relu(cam)+1. #F.leaky_relu(cam)
 
     def infer_class_maps(self, x):
         x = self.lin(x.permute(0, 2, 3, 1))
@@ -112,7 +112,7 @@ class Infusion(nn.Module):
         boundary_max = im2col_boundary(boundary, Hf, Wf, padding, 1, dilation,dist_to_center)
         boundary_sim = torch.ones_like(boundary_max)-boundary_max+1e-5
         boundary_sim = boundary_sim.unsqueeze(0).unsqueeze(0) # torch.Size([1, 1, 25, 52488])
-        
+        # boundary_sim = torch.pow(boundary_sim,2)
         att =  boundary_sim/torch.sum(boundary_sim,dim=2,keepdim=True) #torch.softmax(boundary_sim, 2) # [1,1,fW*fH,W*H*B]
         att = att*((1-boundary).permute(1,2,3,0).contiguous().view(-1)[None,None,None,:])
         V_trans = im2col_indices(V, Hf, Wf, padding, 1, dilation).view(1, self.v_dim, Hf*Wf, -1) # torch.Size([1, 2, 9, 52488])
@@ -200,7 +200,7 @@ class Relation(nn.Module):
             dist_to_center = self.dist_pattern_dict[ksize]
             feats_r.append(self.infuse(feats,boundary, ksize, dilation,self.dist_pattern_dict[ksize]))
             
-        feats_r = torch.stack(feats_r, dim=0).sum(0)
+        feats_r = torch.stack(feats_r, dim=0).sum(0)#/len(self.rel_pattern)
         pred_r = torch.mean(feats_r.view(N, self.n_class, -1), dim=2)
         pred_r = pred_r/torch.tensor([1,1,BG_FG_RATIO]).type(device.FloatTensor)[None,:]
         return pred_r, feats_r
