@@ -65,7 +65,7 @@ class WeaklySupNet(nn.Module):
         
         boundary = self.boundary(feats_rel)
         pred0, cam0 = self.gap0(feats_lc)
-        pred1, cam1 = self.relation(cam0, boundary)
+        pred1, cam1 = self.relation(cam0.detach(), boundary)
         pred2, cam2 = self.relation(cam1, boundary)
         pred3, cam3 = self.relation(cam2, boundary)
 

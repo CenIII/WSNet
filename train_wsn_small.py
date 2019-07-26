@@ -66,7 +66,7 @@ def loadData():
 		imgs.append(np.moveaxis(cv2.imread(os.path.join('./data/', file)), -1, 0))
 	label = [[1, 0,1], [1, 0,1], [1, 0,1], [1, 0,1], [0, 1,1], [0, 1,1], [0, 1,1], [0, 1,1]]
 	# label = [[1, 0], [1, 0], [1, 0], [1, 0], [0, 1], [0, 1], [0, 1], [0, 1]]
-	label_vis = [0, 0, 0, 0, 1, 2, 1, 1]
+	label_vis = [0, 0, 0, 0, 1, 1, 1, 1]
 	imgs = torch.tensor(imgs).type(device.FloatTensor)
 	label = torch.tensor(label).type(device.FloatTensor)
 	label_vis = torch.tensor(label_vis)#.type(device.FloatTensor)
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
 	net = WeaklySupNet(nclass=3)
 	optimizer = torch.optim.Adam(net.parameters(), lr=0.0005)
-	crit0 = torch.nn.MultiLabelSoftMarginLoss(weight=torch.tensor([1,1,1.5]).type(device.FloatTensor))
+	crit0 = torch.nn.MultiLabelSoftMarginLoss(weight=torch.tensor([1,1,1]).type(device.FloatTensor))
 	crit1 = multilabel_soft_pull_loss
 	data, label, label_vis = loadData()
 	train(net, data, label, label_vis, optimizer, crit0, crit1)

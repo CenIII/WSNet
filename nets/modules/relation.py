@@ -9,6 +9,9 @@ else:
 	import torch as device
 import torch.nn.functional as F
 
+BG_THRES = 0.1
+BG_FG_RATIO = 8
+
 class Gap(nn.Module):
     def __init__(self, in_channels, n_class):
         super(Gap, self).__init__()
@@ -19,11 +22,12 @@ class Gap(nn.Module):
         N = x.shape[0]
         cam = self.lin(x) #.permute(0, 2, 3, 1)
         cam_2 = torch.sum(F.relu(cam),dim=1,keepdim=True)/2
-        thres = 0.1*torch.max(cam_2.view(N,-1),dim=1)[0]
+        thres = BG_THRES*torch.max(cam_2.view(N,-1),dim=1)[0]
         cam_2 = thres[:,None,None,None]-cam_2#F.relu()+1e-5
         cam = torch.cat((cam,cam_2),dim=1)
 
         pred = torch.mean(cam.view(N, self.n_class, -1), dim=2)
+        # pred = pred/torch.tensor([1,1,10]).type(device.FloatTensor)[None,:]
         return pred, F.relu(cam) #F.relu(cam)+1. #F.leaky_relu(cam)
 
     def infer_class_maps(self, x):
@@ -55,12 +59,12 @@ class Boundary(nn.Module):
     def __init__(self,in_channels):
         super(Boundary,self).__init__()
         self.nn = nn.Sequential(
-            nn.Conv2d(in_channels,in_channels,(3,3)),#,padding=1),
-            nn.GroupNorm(4,in_channels),
+            nn.Conv2d(in_channels,in_channels,(1,1)),#,padding=1),
+            # nn.GroupNorm(4,in_channels),
             nn.ReLU(),
-            nn.Conv2d(in_channels,in_channels,(1,1),padding=1),
-            nn.GroupNorm(4, in_channels),
-            nn.ReLU(),
+            nn.Conv2d(in_channels,in_channels,(1,1)),
+            # nn.GroupNorm(4, in_channels),
+            # nn.ReLU(),
             # nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
             # nn.GroupNorm(8, in_channels),
             # nn.ReLU(),
@@ -206,4 +210,5 @@ class Relation(nn.Module):
             
         feats_r = torch.stack(feats_r, dim=0).sum(0)
         pred_r = torch.mean(feats_r.view(N, self.n_class, -1), dim=2)
+        pred_r = pred_r/torch.tensor([1,1,BG_FG_RATIO]).type(device.FloatTensor)[None,:]
         return pred_r, feats_r
