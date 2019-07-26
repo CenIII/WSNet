@@ -66,7 +66,7 @@ def loadData():
 		imgs.append(np.moveaxis(cv2.imread(os.path.join('./data/', file)), -1, 0))
 	label = [[1, 0,1], [1, 0,1], [1, 0,1], [1, 0,1], [0, 1,1], [0, 1,1], [0, 1,1], [0, 1,1]]
 	# label = [[1, 0], [1, 0], [1, 0], [1, 0], [0, 1], [0, 1], [0, 1], [0, 1]]
-	label_vis = [0, 0, 0, 0, 1, 2, 1, 1]
+	label_vis = [0, 0, 0, 0, 1, 1, 1, 1]
 	imgs = torch.tensor(imgs).type(device.FloatTensor)
 	label = torch.tensor(label).type(device.FloatTensor)
 	label_vis = torch.tensor(label_vis)#.type(device.FloatTensor)
