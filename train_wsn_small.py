@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
 	net = WeaklySupNet(nclass=3)
 	optimizer = torch.optim.Adam(net.parameters(), lr=0.0005)
-	crit0 = torch.nn.MultiLabelSoftMarginLoss()#weight=torch.tensor([1,1,0.5]).type(device.FloatTensor))
+	crit0 = torch.nn.MultiLabelSoftMarginLoss(weight=torch.tensor([1,1,1.5]).type(device.FloatTensor))
 	crit1 = multilabel_soft_pull_loss
 	data, label, label_vis = loadData()
 	train(net, data, label, label_vis, optimizer, crit0, crit1)

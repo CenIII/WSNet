@@ -20,8 +20,9 @@ class Gap(nn.Module):
         cam = self.lin(x) #.permute(0, 2, 3, 1)
         cam_2 = torch.sum(F.relu(cam),dim=1,keepdim=True)/2
         thres = 0.1*torch.max(cam_2.view(N,-1),dim=1)[0]
-        cam_2 = F.relu(thres[:,None,None,None]-cam_2)+1e-5
+        cam_2 = thres[:,None,None,None]-cam_2#F.relu()+1e-5
         cam = torch.cat((cam,cam_2),dim=1)
+
         pred = torch.mean(cam.view(N, self.n_class, -1), dim=2)
         return pred, F.relu(cam) #F.relu(cam)+1. #F.leaky_relu(cam)
 

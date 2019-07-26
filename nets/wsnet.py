@@ -23,7 +23,7 @@ class WeaklySupNet(nn.Module):
             nn.Conv2d(3, 32, (5, 5), padding=2), 
             nn.BatchNorm2d(32), 
             nn.ReLU(), 
-            nn.MaxPool2d(3), 
+            nn.MaxPool2d(2), 
         ), nn.Sequential(
             nn.Conv2d(32, 64, (3, 3), padding=1), 
             nn.BatchNorm2d(64), 
