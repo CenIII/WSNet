@@ -39,10 +39,11 @@ class WeaklySupNet(nn.Module):
         
         self.boundary = Boundary(160)
         self.branch_local = nn.Sequential(
-            nn.Conv2d(64, 64, (3, 3), padding=1),
+            nn.Conv2d(64, 128, (3, 3), padding=1),
+            # nn.BatchNorm2d(128)
         )
         
-        self.gap0 = Gap(64, nclass)
+        self.gap0 = Gap(128, nclass)
         self.relation = Relation(nclass, kq_dim, nclass, n_heads=1, rel_pattern=[(3,3),(3,1),(3,5),(5,1)])
         self.nclass = nclass
 
@@ -67,10 +68,10 @@ class WeaklySupNet(nn.Module):
         pred0, cam0 = self.gap0(feats_lc)
         pred1, cam1 = self.relation(cam0, boundary)
         pred2, cam2 = self.relation(cam1, boundary)
-        pred3, cam3 = self.relation(cam2, boundary)
+        # pred3, cam3 = self.relation(cam2, boundary)
 
         self.bmap = boundary.squeeze()
         self.initheatmaps = cam0.permute(0,2,3,1)
-        self.heatmaps = cam3.permute(0,2,3,1)
+        self.heatmaps = cam2.permute(0,2,3,1)
     
-        return [pred1, pred2, pred3], pred0 
+        return [pred1, pred2], pred0 

@@ -60,16 +60,8 @@ class Boundary(nn.Module):
         super(Boundary,self).__init__()
         self.nn = nn.Sequential(
             nn.Conv2d(in_channels,in_channels,(1,1)),#,padding=1),
-            # nn.GroupNorm(4,in_channels),
             nn.ReLU(),
-            nn.Conv2d(in_channels,in_channels,(1,1)),
-            # nn.GroupNorm(4, in_channels),
-            # nn.ReLU(),
-            # nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
-            # nn.GroupNorm(8, in_channels),
-            # nn.ReLU(),
-            # nn.Conv2d(in_channels,in_channels,(3,3),padding=1),
-            # nn.BatchNorm2d(in_channels),
+            # nn.Conv2d(in_channels,in_channels,(1,1)),
             nn.Conv2d(in_channels,1,(1,1)),
             nn.Sigmoid()
         )
