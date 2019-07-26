@@ -45,7 +45,7 @@ class WeaklySupNet(nn.Module):
         self.boundary = Boundary(160)
         self.branch_local = nn.Sequential(
             nn.Conv2d(64, 128, (3, 3), padding=1),
-            # nn.BatchNorm2d(128)
+            nn.BatchNorm2d(128)
         )
         
         self.gap0 = Gap(128, nclass)
@@ -66,9 +66,9 @@ class WeaklySupNet(nn.Module):
         x1 = self.backbone[0](x)
         x2 = self.backbone[1](x1)
         bb = self.backbone[2](x2)
-        bb2 = self.backbone[3](x2)
+        # bb2 = self.backbone[3](x2)
         feats_rel = torch.cat((self.parymid(x1),x2,bb),dim=1)
-        feats_lc = self.branch_local(bb2)
+        feats_lc = self.branch_local(bb)
         
         boundary = self.boundary(feats_rel)
         pred0, cam0 = self.gap0(feats_lc)
