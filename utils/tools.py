@@ -89,7 +89,9 @@ def im2col_boundary(x, field_height, field_width, padding=1, stride=1, dilate=1,
     cols_all = torch.stack(cols_list) # torch.Size([Dilate, B, fW*fH*D, W*H])
 
     # For each distance, find the max value on path with dilationd distance [0,dist_i*dilate]
-    for dist_i in range(0,int(field_height/2)+1): # calculate max on path, dilate_i=k choose from k+1 values
+    cols,_ = torch.max(cols_all[:1,:,:,:],dim=0)
+    cols_max_list.append(cols)
+    for dist_i in range(1,int(field_height/2)+1): # calculate max on path, dilate_i=k choose from k+1 values
         cols,_ = torch.max(cols_all[:dist_i*dilate+1,:,:,:],dim=0) # torch.Size([B, fW*fH*D, W*H])
         cols_max_list.append(cols)
     cols_max_all = torch.stack(cols_max_list) # torch.Size([Dilate, B, fW*fH*D, W*H])
